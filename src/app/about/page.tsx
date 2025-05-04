@@ -1,8 +1,10 @@
 // src/app/about/page.tsx
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Added Avatar
+import { Separator } from '@/components/ui/separator'; // Added Separator
 import Image from 'next/image';
-import { HandHeart, Target, Users } from 'lucide-react';
+import { HandHeart, Target, Users, Code, Bot, Brush, GraduationCap } from 'lucide-react'; // Added icons
 
 export default function AboutPage() {
   return (
@@ -51,6 +53,47 @@ export default function AboutPage() {
                 Volunteer Connect was founded by a group of community enthusiasts who believe in the power of collective action. We provide a simple, effective platform for non-profits, charities, and community groups to find the help they need, and for volunteers to discover meaningful opportunities.
               </p>
             </div>
+
+            {/* Developer Section */}
+            <Separator />
+            <div className="text-center pt-8">
+              <h3 className="text-2xl font-semibold text-primary mb-6">Developed By</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                {/* Muhammad Huzaifa */}
+                <div className="flex flex-col items-center">
+                  <Avatar className="h-20 w-20 mb-3">
+                    {/* Placeholder image/icon - replace if available */}
+                    {/* <AvatarImage src="/path/to/huzaifa.jpg" alt="Muhammad Huzaifa" /> */}
+                    <AvatarFallback className="bg-primary/10 text-primary text-2xl">MH</AvatarFallback>
+                  </Avatar>
+                  <h4 className="font-semibold text-lg">Muhammad Huzaifa</h4>
+                  <p className="text-accent flex items-center gap-1"><Code className="h-4 w-4" /> Backend Developer</p>
+                </div>
+                {/* Obaida Naeem */}
+                <div className="flex flex-col items-center">
+                  <Avatar className="h-20 w-20 mb-3">
+                    {/* <AvatarImage src="/path/to/obaida.jpg" alt="Obaida Naeem" /> */}
+                    <AvatarFallback className="bg-primary/10 text-primary text-2xl">ON</AvatarFallback>
+                  </Avatar>
+                  <h4 className="font-semibold text-lg">Obaida Naeem</h4>
+                  <p className="text-accent flex items-center gap-1"><Bot className="h-4 w-4" /> AI Developer</p>
+                </div>
+                {/* Love Kumar */}
+                <div className="flex flex-col items-center">
+                  <Avatar className="h-20 w-20 mb-3">
+                     {/* <AvatarImage src="/path/to/love.jpg" alt="Love Kumar" /> */}
+                    <AvatarFallback className="bg-primary/10 text-primary text-2xl">LK</AvatarFallback>
+                  </Avatar>
+                  <h4 className="font-semibold text-lg">Love Kumar</h4>
+                  <p className="text-accent flex items-center gap-1"><Brush className="h-4 w-4" /> Frontend Developer</p>
+                </div>
+              </div>
+              <div className="mt-6 text-muted-foreground flex items-center justify-center gap-2">
+                 <GraduationCap className="h-5 w-5" />
+                 <span>FAST University, Karachi</span>
+              </div>
+            </div>
+
           </CardContent>
         </Card>
       </div>
