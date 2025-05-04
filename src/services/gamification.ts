@@ -1,3 +1,4 @@
+
 'use server';
 // src/services/gamification.ts
 import { readData, writeData, mapToObject, objectToMap } from '@/lib/db-utils';
@@ -287,4 +288,3 @@ export async function recordOpportunityCompletion(userId: string, opportunityId:
    const finalStats = await logHours(userId, hoursVolunteered, opportunityId);
    return finalStats;
 }
-```
