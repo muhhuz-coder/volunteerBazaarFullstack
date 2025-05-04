@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 // Updated icons and added Bell for Notifications
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell } from 'lucide-react';
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search } from 'lucide-react'; // Added Briefcase, Search
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,18 +46,21 @@ export function Header() {
                       : role === 'volunteer' ? '/dashboard/volunteer'
                       : '/select-role';
 
+   // Add icons to base links
    const baseNavLinks = [
-     { href: "/", label: "Opportunities" },
-     { href: "/about", label: "About Us" },
-     { href: "/how-it-works", label: "How It Works" },
-     { href: "/contact", label: "Contact" },
+     { href: "/", label: "Opportunities", icon: Search },
+     { href: "/about", label: "About Us", icon: Info },
+     { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
+     { href: "/contact", label: "Contact", icon: Mail },
      { href: "/analytics", label: "Analytics", icon: BarChart3 },
    ];
 
+   // Ensure user-specific links also have icons if needed
    const navLinks = user
      ? [
-         ...baseNavLinks.filter(link => link.href !== '/analytics'),
+         ...baseNavLinks.filter(link => link.href !== '/analytics' && link.href !== '/contact'), // Keep Opportunities, About, How It Works
          { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
+         { href: "/contact", label: "Contact", icon: Mail }, // Add contact back for logged in users
          { href: "/analytics", label: "Analytics", icon: BarChart3 },
        ]
      : baseNavLinks;
@@ -77,6 +80,7 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-4">
            {navLinks.map(link => (
               <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10 relative">
+                 {/* Ensure link content includes icon */}
                 <Link href={link.href} className="flex items-center gap-1.5">
                    {link.icon && <link.icon className="h-4 w-4" />}
                    {link.label}
@@ -147,6 +151,13 @@ export function Header() {
                           <span>Messages</span>
                          </Link>
                       </DropdownMenuItem>
+                      {/* Add Notifications link in dropdown */}
+                       <DropdownMenuItem asChild>
+                           <Link href="/notifications">
+                               <Bell className="mr-2 h-4 w-4" />
+                               <span>Notifications</span>
+                           </Link>
+                       </DropdownMenuItem>
                      </>
                  ) : (
                      <DropdownMenuItem asChild>
@@ -186,6 +197,7 @@ export function Header() {
               <SheetContent side="right" className="w-[280px] bg-background text-foreground p-4 flex flex-col">
                  <h2 className="text-lg font-semibold mb-4 border-b pb-2">Menu</h2>
                  <nav className="flex flex-col gap-2 mb-6">
+                     {/* Ensure mobile links also render icons */}
                     {navLinks.map(link => (
                        <Button key={link.href} variant="ghost" asChild className="justify-start text-base" onClick={closeMobileMenu}>
                          <Link href={link.href} className="flex items-center gap-2">
