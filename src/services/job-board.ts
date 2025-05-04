@@ -14,7 +14,7 @@ export interface Opportunity {
   location: string;
   commitment: string;
   category: string;
-  pointsAwarded?: number;
+  pointsAwarded?: number; // Optional points awarded upon completion/acceptance
 }
 
 /**
@@ -44,7 +44,10 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Load data dynamically within functions to ensure server-side execution context
 
 async function loadOpportunitiesData(): Promise<Opportunity[]> {
-    return await readData<Opportunity[]>(OPPORTUNITIES_FILE, []);
+    const opportunities = await readData<Opportunity[]>(OPPORTUNITIES_FILE, []);
+    // Ensure pointsAwarded exists or set a default (e.g., 0 or undefined) if needed
+    // For now, assume data structure is consistent or handle missing fields during use
+    return opportunities;
 }
 
 async function loadApplicationsData(): Promise<VolunteerApplication[]> {
@@ -98,8 +101,14 @@ export async function getApplicationsForOrganization(organizationId: string): Pr
     const opportunitiesData = await loadOpportunitiesData();
     const applicationsData = await loadApplicationsData();
 
-    const orgOpportunities = opportunitiesData.filter(opp => opp.organizationId === organizationId).map(opp => opp.id);
-    const applications = applicationsData.filter(app => orgOpportunities.includes(app.opportunityId));
+    // Find opportunities belonging to this organization first
+    const orgOpportunityIds = opportunitiesData
+        .filter(opp => opp.organizationId === organizationId)
+        .map(opp => opp.id);
+
+    // Filter applications that belong to those opportunities
+    const applications = applicationsData.filter(app => orgOpportunityIds.includes(app.opportunityId));
+
 
     console.log(`Returning ${applications.length} applications for organization ${organizationId}.`);
     return applications.map(app => ({
@@ -150,6 +159,7 @@ export async function submitVolunteerApplication(application: Omit<VolunteerAppl
     ...application,
     id: newId,
     submittedAt: new Date(), // Record submission time
+    status: 'submitted', // Ensure status is set correctly
   };
 
   // Update data and write to file
@@ -197,7 +207,7 @@ export async function updateApplicationStatus(
     return { ...applicationsData[appIndex] }; // Return a copy
 }
 
-// --- CRUD for Opportunities (Example - Add if needed) ---
+// --- CRUD for Opportunities ---
 
 /**
  * Creates a new volunteer opportunity.
@@ -208,7 +218,12 @@ export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>
     await sleep(300);
     let opportunitiesData = await loadOpportunitiesData(); // Load current data
     const newId = `opp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const newOpportunity: Opportunity = { ...opportunityData, id: newId };
+    const newOpportunity: Opportunity = {
+      ...opportunityData,
+      id: newId,
+      // Ensure pointsAwarded is a number, default to 0 if undefined or invalid
+      pointsAwarded: typeof opportunityData.pointsAwarded === 'number' && opportunityData.pointsAwarded >= 0 ? opportunityData.pointsAwarded : 0,
+    };
 
     opportunitiesData.push(newOpportunity);
     await writeData(OPPORTUNITIES_FILE, opportunitiesData);

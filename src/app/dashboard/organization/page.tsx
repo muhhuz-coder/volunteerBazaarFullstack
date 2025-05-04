@@ -10,44 +10,52 @@ import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2 } from 'lucide-react';
+import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings } from 'lucide-react'; // Added Briefcase, Settings
 // Remove direct service imports
-// import { getApplicationsForOrganization, updateApplicationStatus, type VolunteerApplication } from '@/services/job-board';
-import type { VolunteerApplication } from '@/services/job-board'; // Keep type
+import type { Opportunity, VolunteerApplication } from '@/services/job-board'; // Keep types
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge'; // Import Badge
+import { Badge } from '@/components/ui/badge';
 // Import server actions
-import { getApplicationsForOrganizationAction } from '@/actions/job-board-actions';
-import { acceptVolunteerApplication, rejectVolunteerApplication } from '@/actions/application-actions'; // Updated actions
+import { getOpportunitiesAction, getApplicationsForOrganizationAction } from '@/actions/job-board-actions';
+import { acceptVolunteerApplication, rejectVolunteerApplication } from '@/actions/application-actions';
 
 
 export default function OrganizationDashboard() {
-  // Remove acceptApplication from useAuth, use the server action directly or via a context wrapper if preferred
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   const [applications, setApplications] = useState<VolunteerApplication[]>([]);
-  const [loadingApps, setLoadingApps] = useState(true);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [loadingData, setLoadingData] = useState(true); // Combined loading state
   const [processingAppId, setProcessingAppId] = useState<string | null>(null);
 
-  const fetchApps = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (user && role === 'organization') {
-      setLoadingApps(true);
+      setLoadingData(true);
       try {
-        // Call the server action to get applications
-        const fetchedApps = await getApplicationsForOrganizationAction(user.id);
-        // Process dates if they come as strings
+        // Fetch applications and opportunities in parallel
+        const [fetchedApps, allOpportunities] = await Promise.all([
+          getApplicationsForOrganizationAction(user.id),
+          getOpportunitiesAction() // Fetch all and filter locally, or modify action if needed
+        ]);
+
+        // Process applications
         const processedApps = fetchedApps.map(app => ({
             ...app,
             submittedAt: typeof app.submittedAt === 'string' ? new Date(app.submittedAt) : app.submittedAt
         }));
         setApplications(processedApps);
+
+        // Filter opportunities for this organization
+        const orgOpportunities = allOpportunities.filter(opp => opp.organizationId === user.id);
+        setOpportunities(orgOpportunities);
+
       } catch (error: any) {
-        console.error('Failed to fetch applications:', error);
-        toast({ title: 'Error', description: error.message || 'Could not load applications.', variant: 'destructive' });
+        console.error('Failed to fetch dashboard data:', error);
+        toast({ title: 'Error', description: error.message || 'Could not load dashboard data.', variant: 'destructive' });
       } finally {
-        setLoadingApps(false);
+        setLoadingData(false);
       }
     }
   }, [user, role, toast]);
@@ -57,23 +65,19 @@ export default function OrganizationDashboard() {
       console.log('Redirecting from organization dashboard: Not logged in or incorrect role.');
       router.push('/login');
     } else if (user && role === 'organization') {
-        fetchApps();
+        fetchData();
     }
      console.log('Organization dashboard effect:', { authLoading, user, role });
-  }, [user, role, authLoading, router, fetchApps]);
+  }, [user, role, authLoading, router, fetchData]);
 
   const handleAccept = async (app: VolunteerApplication) => {
-     if (!user) return; // Should not happen if checks above work
+     if (!user) return;
      setProcessingAppId(app.id);
      try {
-        // Use the server action directly
         const result = await acceptVolunteerApplication(app.id, app.volunteerId, user.id, user.displayName);
         if (result.success) {
            toast({ title: 'Success', description: `Application accepted. Conversation started.` });
-           // Update UI: Change status locally or re-fetch
            setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'accepted' } : a));
-           // Optional: Fetch latest points/badges for the accepted volunteer if needed elsewhere
-           // Consider navigating to the conversation
            if (result.conversationId) {
               router.push(`/dashboard/messages/${result.conversationId}`);
            }
@@ -91,11 +95,9 @@ export default function OrganizationDashboard() {
   const handleReject = async (app: VolunteerApplication) => {
       setProcessingAppId(app.id);
       try {
-          // Use the server action for rejection
           const result = await rejectVolunteerApplication(app.id);
            if (result.success) {
                toast({ title: 'Success', description: `Application rejected.` });
-               // Update UI
                setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'rejected' } : a));
            } else {
                toast({ title: 'Error', description: result.message, variant: 'destructive' });
@@ -110,7 +112,7 @@ export default function OrganizationDashboard() {
 
 
   // Combined loading state
-  if (authLoading || (user && role === 'organization' && loadingApps)) {
+  if (authLoading || (user && role === 'organization' && loadingData)) {
     return (
        <div className="flex flex-col min-h-screen bg-secondary">
          <Header />
@@ -120,8 +122,9 @@ export default function OrganizationDashboard() {
              <Skeleton className="h-10 w-40" />
            </div>
            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-lg" />)}
            </div>
+           <Skeleton className="h-64 w-full mt-6" />
            <Skeleton className="h-64 w-full mt-6" />
          </div>
          <footer className="bg-primary p-4 mt-auto">
@@ -153,46 +156,79 @@ export default function OrganizationDashboard() {
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
       <Header />
-      <div className="container mx-auto px-4 py-8 flex-grow">
-        <div className="flex justify-between items-center mb-6">
+      <div className="container mx-auto px-4 py-12 flex-grow"> {/* Adjusted padding */}
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-8"> {/* Adjusted gap and margin */}
           <h1 className="text-3xl font-bold text-primary">Organization Dashboard</h1>
-          {/* TODO: Implement "Post New Opportunity" functionality */}
-          <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-            <PlusCircle className="mr-2 h-4 w-4" /> Post New Opportunity
+          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
+             <Link href="/dashboard/organization/create">
+              <PlusCircle className="mr-2 h-4 w-4" /> Post New Opportunity
+             </Link>
           </Button>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-           <Card className="shadow-md border">
-             <CardHeader>
-               <CardTitle>Active Opportunities</CardTitle>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8"> {/* Adjusted gap and margin */}
+           <Card className="shadow-md border hover:shadow-lg transition-shadow">
+             <CardHeader className="pb-2">
+               <CardTitle className="text-lg flex items-center gap-2"><Briefcase className="h-5 w-5 text-accent" /> Active Opportunities</CardTitle>
                <CardDescription>Manage your current volunteer postings.</CardDescription>
              </CardHeader>
              <CardContent>
-                {/* TODO: Fetch and display actual count */}
-               <p>You have active volunteer opportunities.</p>
+               <p className="text-3xl font-bold text-primary">{opportunities.length}</p>
              </CardContent>
            </Card>
-           <Card className="shadow-md border">
-             <CardHeader>
-               <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Total Applications</CardTitle>
+           <Card className="shadow-md border hover:shadow-lg transition-shadow">
+             <CardHeader className="pb-2">
+               <CardTitle className="text-lg flex items-center gap-2"><FileText className="h-5 w-5 text-accent" /> Total Applications</CardTitle>
                 <CardDescription>Overview of all received applications.</CardDescription>
              </CardHeader>
              <CardContent>
-                <p>{applications.length} total applications received.</p>
+                <p className="text-3xl font-bold text-primary">{applications.length}</p>
              </CardContent>
            </Card>
-            <Card className="shadow-md border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Organization Profile</CardTitle>
+            <Card className="shadow-md border hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2"><Settings className="h-5 w-5 text-accent" /> Organization Profile</CardTitle>
                  <CardDescription>Update your organization's information.</CardDescription>
               </CardHeader>
               <CardContent>
-                <p>Keep your organization details current.</p>
-                 {/* TODO: Link to profile settings page */}
+                 <Button variant="outline" size="sm" disabled>Edit Profile</Button> {/* Placeholder */}
               </CardContent>
             </Card>
         </div>
 
+        {/* List of Opportunities */}
+        <Card className="shadow-lg border mb-8">
+            <CardHeader>
+                <CardTitle>Your Opportunities</CardTitle>
+                <CardDescription>Overview of opportunities posted by your organization.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {opportunities.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                        {opportunities.map(opp => (
+                            <div key={opp.id} className="flex justify-between items-center p-3 bg-card/80 rounded-md border">
+                                <div>
+                                    <p className="font-medium">{opp.title}</p>
+                                    <p className="text-sm text-muted-foreground">{opp.location} - {opp.category}</p>
+                                </div>
+                                <Button variant="outline" size="sm" disabled>Manage</Button> {/* Placeholder */}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                     <div className="text-center py-6">
+                        <p className="text-muted-foreground mb-3">You haven't posted any opportunities yet.</p>
+                         <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                           <Link href="/dashboard/organization/create">
+                             <PlusCircle className="mr-2 h-4 w-4" /> Post First Opportunity
+                           </Link>
+                         </Button>
+                     </div>
+                )}
+            </CardContent>
+        </Card>
+
+
+        {/* Applications Section */}
         <Card className="shadow-lg border">
           <CardHeader>
             <CardTitle>New Volunteer Applications ({submittedApplications.length})</CardTitle>
@@ -204,14 +240,13 @@ export default function OrganizationDashboard() {
                 {submittedApplications.map(app => (
                   <Card key={app.id} className="bg-card/80 border">
                     <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
+                      <div className="flex flex-wrap justify-between items-start gap-2">
                          <div>
                             <CardTitle className="text-lg">{app.applicantName}</CardTitle>
                             <CardDescription>Interested in: {app.opportunityTitle}</CardDescription>
-                            {/* Ensure submittedAt is a Date object before formatting */}
                             <CardDescription>Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : 'Invalid Date'}</CardDescription>
                          </div>
-                          <Badge variant="secondary">{app.status}</Badge>
+                          <Badge variant="secondary" className="capitalize">{app.status}</Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="text-sm space-y-1 pb-3">
@@ -249,7 +284,7 @@ export default function OrganizationDashboard() {
           </CardContent>
         </Card>
 
-         <div className="mt-6 text-center">
+         <div className="mt-8 text-center"> {/* Adjusted margin */}
             <Button asChild variant="outline">
                <Link href="/dashboard/messages">
                  <MessageSquare className="mr-2 h-4 w-4" /> View All Messages
@@ -264,4 +299,3 @@ export default function OrganizationDashboard() {
     </div>
   );
 }
-

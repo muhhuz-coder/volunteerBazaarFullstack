@@ -6,8 +6,8 @@ import {
     getOpportunities as getOpportunitiesService,
     getApplicationsForOrganization as getOrgAppsService,
     getApplicationsForVolunteer as getVolunteerAppsService,
-    createOpportunity as createOpportunityService, // If needed later
-    getOpportunityById as getOpportunityByIdService // If needed later
+    createOpportunity as createOpportunityService, // Import the service
+    getOpportunityById as getOpportunityByIdService
 } from '@/services/job-board';
 import type { Opportunity, VolunteerApplication } from '@/services/job-board';
 
@@ -71,18 +71,29 @@ export async function getOpportunityByIdAction(id: string): Promise<Opportunity 
      }
 }
 
-// Example for creating an opportunity (add if needed)
-/*
-export async function createOpportunityAction(opportunityData: Omit<Opportunity, 'id'>): Promise<Opportunity | { error: string }> {
-    console.log('Server Action: Creating opportunity');
+/**
+ * Server action to create a new volunteer opportunity.
+ */
+export async function createOpportunityAction(
+    opportunityData: Omit<Opportunity, 'id'>,
+    organizationId: string,
+    organizationName: string
+): Promise<{ success: boolean; message: string; opportunity?: Opportunity | null }> {
+    console.log('Server Action: Creating opportunity for org:', organizationId);
     try {
-        // Add validation logic here if needed
-        const newOpportunity = await createOpportunityService(opportunityData);
-        return newOpportunity;
+        // Add validation logic here if needed (e.g., check if fields are empty)
+        if (!opportunityData.title || !opportunityData.description || !opportunityData.location || !opportunityData.commitment || !opportunityData.category) {
+            return { success: false, message: 'Missing required opportunity details.', opportunity: null };
+        }
+
+        const newOpportunity = await createOpportunityService({
+            ...opportunityData,
+            organizationId: organizationId, // Ensure the correct org ID is set
+            organization: organizationName // Ensure the correct org name is set
+        });
+        return { success: true, message: 'Opportunity created successfully.', opportunity: newOpportunity };
     } catch (error: any) {
         console.error("Server Action: Create opportunity error -", error);
-        return { error: error.message || 'Failed to create opportunity.' };
+        return { success: false, message: error.message || 'Failed to create opportunity.', opportunity: null };
     }
 }
-*/
-
