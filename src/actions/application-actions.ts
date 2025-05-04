@@ -8,6 +8,7 @@ import {
     getOpportunityById // Needed to award correct points
 } from '@/services/job-board';
 import { createConversation as createConversationService } from '@/services/messaging';
+import { createNotification } from '@/services/notification'; // Import notification service
 import type { VolunteerApplication, Opportunity } from '@/services/job-board';
 import type { Conversation } from '@/services/messaging'; // Import Conversation type
 import { addPointsAction } from './gamification-actions'; // Import gamification action
@@ -43,7 +44,7 @@ export async function submitVolunteerApplicationAction(
 
 /**
  * Server action to accept a volunteer application.
- * Updates application status, creates a conversation, and potentially awards points.
+ * Updates application status, creates a conversation, potentially awards points, and creates a notification.
  */
 export async function acceptVolunteerApplication(
     applicationId: string,
@@ -68,29 +69,33 @@ export async function acceptVolunteerApplication(
         });
 
         // 3. Award points (call the action directly)
-        // Get opportunity points if available
         let pointsToAward = 50; // Default acceptance points
         try {
             const opportunity = await getOpportunityById(updatedApp.opportunityId);
             if (opportunity && opportunity.pointsAwarded) {
-                pointsToAward = opportunity.pointsAwarded; // Use opportunity-specific points if defined
+                pointsToAward = opportunity.pointsAwarded;
             }
         } catch (e) {
             console.warn("Could not fetch opportunity details for points, using default.")
         }
         await addPointsAction(volunteerId, pointsToAward, `Accepted for opportunity: ${updatedApp.opportunityTitle}`);
 
-        return { success: true, message: 'Application accepted and conversation started.', conversationId: conversation.id, updatedApp: updatedApp };
+        // 4. Create Notification for the volunteer
+        const notificationMessage = `Your application for "${updatedApp.opportunityTitle}" has been accepted!`;
+        const notificationLink = `/dashboard/messages/${conversation.id}`; // Link to the new conversation
+        await createNotification(volunteerId, notificationMessage, notificationLink);
+
+        return { success: true, message: 'Application accepted, conversation started, and notification sent.', conversationId: conversation.id, updatedApp: updatedApp };
     } catch (error: any) {
         console.error("Server Action: Accept application error -", error);
-        // Consider rolling back status update if conversation creation fails? (More complex)
+        // Consider rolling back status update if conversation/notification creation fails? (More complex)
         return { success: false, message: error.message || 'Failed to accept application.', updatedApp: null };
     }
 }
 
 /**
  * Server action to reject a volunteer application.
- * Updates application status.
+ * Updates application status and creates a notification.
  */
 export async function rejectVolunteerApplication(
     applicationId: string
@@ -99,7 +104,14 @@ export async function rejectVolunteerApplication(
      try {
         // Update application status via service
         const updatedApp = await updateAppStatusService(applicationId, 'rejected');
-        return { success: true, message: 'Application rejected.', updatedApp: updatedApp };
+
+        // Create Notification for the volunteer
+        const notificationMessage = `Unfortunately, your application for "${updatedApp.opportunityTitle}" was not accepted at this time.`;
+        // No specific link for rejection, maybe link to their dashboard?
+        const notificationLink = `/dashboard/volunteer`;
+        await createNotification(updatedApp.volunteerId, notificationMessage, notificationLink);
+
+        return { success: true, message: 'Application rejected and notification sent.', updatedApp: updatedApp };
      } catch (error: any) {
         console.error("Server Action: Reject application error -", error);
         return { success: false, message: error.message || 'Failed to reject application.', updatedApp: null };
