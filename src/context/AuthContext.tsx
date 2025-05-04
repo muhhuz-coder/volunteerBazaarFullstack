@@ -1,3 +1,4 @@
+
 // src/context/AuthContext.tsx
 'use client';
 
@@ -46,7 +47,7 @@ interface AuthContextType {
   signUp: (email: string, pass: string, name: string, role: UserRole) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
   setRoleAndUpdateUser: (role: UserRole) => Promise<void>;
-  submitApplication: (application: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt'>) => Promise<{ success: boolean; message: string }>;
+  submitApplication: (application: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>) => Promise<{ success: boolean; message: string }>;
   acceptApplication: (applicationId: string, volunteerId: string) => Promise<{ success: boolean; message: string; conversationId?: string }>;
   getUserConversations: () => Promise<Conversation[]>;
   addPoints: (userId: string, points: number, reason: string) => Promise<void>;
@@ -81,14 +82,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     async function loadUsers() {
         if (isDataLoaded) return; // Prevent re-loading if already done
         console.log('AuthProvider: Loading initial user data...');
+        let usersObject: Record<string, UserProfile> = {};
         try {
-            const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+            usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
             const loadedUsersMap = objectToMap(usersObject);
             // Fetch initial stats for default users if they exist
             for (const [email, profile] of loadedUsersMap.entries()) {
                 if (profile.role === 'volunteer' && !profile.stats) {
-                    profile.stats = await fetchUserStats(profile.id); // Fetch stats if missing
-                    loadedUsersMap.set(email, profile); // Update map
+                    try {
+                        const stats = await fetchUserStats(profile.id); // Fetch stats if missing
+                        profile.stats = stats;
+                        loadedUsersMap.set(email, profile); // Update map
+                    } catch (statsError) {
+                        console.error(`AuthProvider: Failed to fetch initial stats for volunteer ${profile.id}:`, statsError);
+                        // Assign default stats if fetch fails to avoid missing stats property
+                        profile.stats = { points: 0, badges: [], hours: 0 };
+                        loadedUsersMap.set(email, profile);
+                    }
                 }
             }
             setUsersData(loadedUsersMap);
@@ -103,8 +113,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             if (storedUser) {
                 try {
                     const parsedUser: UserProfile = JSON.parse(storedUser);
-                    // Optional: Re-validate user against loaded data?
+                    // Optional: Re-validate user against loaded data
                      if (usersObject[parsedUser.email]) { // Check if user still exists in loaded data
+                        // Ensure stats are loaded if they were fetched after session was stored
+                        if (parsedUser.role === 'volunteer' && !parsedUser.stats) {
+                            const liveUser = usersData.get(parsedUser.email);
+                            if (liveUser && liveUser.stats) {
+                                parsedUser.stats = liveUser.stats;
+                            }
+                        }
                         setUser(parsedUser);
                         setRole(parsedUser.role);
                         console.log('AuthProvider: Restored user session from sessionStorage.', parsedUser);
@@ -120,7 +137,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
     }
     loadUsers();
-  }, []);
+  }, [usersData]); // Depend on usersData to ensure stats are loaded after initial load
 
   // --- Auth Methods ---
   const signIn = useCallback(async (email: string, pass: string): Promise<{ success: boolean; message: string; role?: UserRole | null }> => {
@@ -139,11 +156,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Simulate password check (in real app, hash compare on backend)
       // For mock, just check if user exists
       let userToSet = existingUser;
-      if (existingUser.role === 'volunteer') {
-          const stats = await fetchUserStats(existingUser.id);
-          userToSet = { ...existingUser, stats };
-          // Update map in state (will trigger re-render if needed)
-          setUsersData(prevMap => new Map(prevMap).set(email, userToSet));
+      if (existingUser.role === 'volunteer' && !existingUser.stats) { // Also check if stats are missing
+          try {
+             const stats = await fetchUserStats(existingUser.id);
+             userToSet = { ...existingUser, stats };
+             // Update map in state (will trigger re-render if needed)
+             setUsersData(prevMap => new Map(prevMap).set(email, userToSet));
+          } catch (statsError) {
+             console.error(`AuthProvider (signIn): Failed to fetch stats for volunteer ${existingUser.id}:`, statsError);
+             // Assign default stats if fetch fails
+             userToSet = { ...existingUser, stats: { points: 0, badges: [], hours: 0 } };
+             setUsersData(prevMap => new Map(prevMap).set(email, userToSet));
+          }
       }
 
       setUser(userToSet);
@@ -193,7 +217,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await writeData(USERS_FILE, mapToObject(updatedUsersMap));
         // If volunteer, potentially initialize stats file if needed (gamification service might handle this)
         if (newUser.role === 'volunteer') {
-             // await addGamificationPoints(newUser.id, 0, "Initial account creation"); // Or let fetchUserStats initialize
+            // Initialization of stats file happens implicitly when getUserStats is called or points/badges are added
         }
         setUser(newUser);
         setRole(newUser.role);
@@ -255,9 +279,47 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
      }
    }, [user, usersData]); // Depend on user and usersData
 
+   // --- Gamification Methods (Call Service Functions) ---
+   const addPointsProxy = useCallback(async (userId: string, points: number, reason: string): Promise<void> => {
+       try {
+         await addGamificationPoints(userId, points, reason); // Service handles persistence
+          // If the action affects the current user, update their context state
+          if (user && user.id === userId) {
+            const updatedStats = await fetchUserStats(userId); // Re-fetch updated stats
+            const updatedUser = { ...user, stats: updatedStats };
+            setUser(updatedUser);
+            sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
+            // Also update the main usersData map in state
+             setUsersData(prevMap => new Map(prevMap).set(user.email, updatedUser));
+          }
+       } catch (error) {
+           console.error(`Context: Failed to add points: ${error}`);
+           // Optionally show a toast to the user
+       }
+   }, [user]); // Depend on user
+
+    const awardBadgeProxy = useCallback(async (userId: string, badgeName: string, reason: string): Promise<void> => {
+        try {
+          await awardGamificationBadge(userId, badgeName, reason); // Service handles persistence
+           // If the action affects the current user, update their context state
+           if (user && user.id === userId) {
+             const updatedStats = await fetchUserStats(userId); // Re-fetch updated stats
+             const updatedUser = { ...user, stats: updatedStats };
+             setUser(updatedUser);
+             sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
+             // Also update the main usersData map in state
+              setUsersData(prevMap => new Map(prevMap).set(user.email, updatedUser));
+           }
+        } catch (error) {
+            console.error(`Context: Failed to award badge: ${error}`);
+             // Optionally show a toast to the user
+        }
+    }, [user]); // Depend on user
+
+
   // --- Feature Methods (Rely on Service Functions) ---
 
-  const submitApplication = useCallback(async (applicationData: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt'>): Promise<{ success: boolean; message: string }> => {
+  const submitApplication = useCallback(async (applicationData: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>): Promise<{ success: boolean; message: string }> => {
     if (!user || user.role !== 'volunteer') {
       return { success: false, message: 'Only logged-in volunteers can apply.' };
     }
@@ -271,7 +333,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
 
       // Award points using the context method (which calls the service)
-      await addPoints(user.id, 5, `Applied for opportunity: ${applicationData.opportunityTitle}`);
+      await addPointsProxy(user.id, 5, `Applied for opportunity: ${applicationData.opportunityTitle}`); // Use addPointsProxy
 
       setLoading(false);
       return { success: true, message: resultMessage };
@@ -279,7 +341,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setLoading(false);
       return { success: false, message: error.message || 'Application submission failed.' };
     }
-  }, [user, addPoints]); // Include addPoints in dependencies
+  }, [user, addPointsProxy]); // Include addPointsProxy in dependencies
 
   const acceptApplication = useCallback(async (applicationId: string, volunteerId: string): Promise<{ success: boolean; message: string; conversationId?: string }> => {
      if (!user || user.role !== 'organization') {
@@ -291,7 +353,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const updatedApp = await updateAppStatus(applicationId, 'accepted');
 
        // 2. Award points to volunteer via context method
-        await addPoints(volunteerId, 50, `Accepted for opportunity: ${updatedApp.opportunityTitle}`);
+        await addPointsProxy(volunteerId, 50, `Accepted for opportunity: ${updatedApp.opportunityTitle}`); // Use addPointsProxy
 
        // 3. Create conversation via service
         const conversation = await createNewConversation({
@@ -300,7 +362,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
            opportunityId: updatedApp.opportunityId,
            opportunityTitle: updatedApp.opportunityTitle, // Pass title
            organizationName: user.displayName, // Pass org name
-           // volunteerName: updatedApp.applicantName, // Pass volunteer name if needed
+           volunteerName: updatedApp.applicantName, // Pass volunteer name
            initialMessage: `Congratulations! Your application for "${updatedApp.opportunityTitle}" has been accepted. Let's coordinate next steps.`,
         });
 
@@ -312,7 +374,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
        console.error("Error accepting application:", error);
        return { success: false, message: error.message || 'Failed to accept application.' };
      }
-   }, [user, addPoints]); // Include addPoints dependency
+   }, [user, addPointsProxy]); // Include addPointsProxy dependency
 
     const getUserConversations = useCallback(async (): Promise<Conversation[]> => {
         if (!user || !user.role) { // Check role exists
@@ -332,42 +394,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       }, [user]);
 
-    // --- Gamification Methods (Call Service Functions) ---
-    const addPointsProxy = useCallback(async (userId: string, points: number, reason: string): Promise<void> => {
-        try {
-          await addGamificationPoints(userId, points, reason); // Service handles persistence
-           // If the action affects the current user, update their context state
-           if (user && user.id === userId) {
-             const updatedStats = await fetchUserStats(userId); // Re-fetch updated stats
-             const updatedUser = { ...user, stats: updatedStats };
-             setUser(updatedUser);
-             sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
-             // Also update the main usersData map in state
-              setUsersData(prevMap => new Map(prevMap).set(user.email, updatedUser));
-           }
-        } catch (error) {
-            console.error(`Context: Failed to add points: ${error}`);
-            // Optionally show a toast to the user
-        }
-    }, [user]); // Depend on user
 
-     const awardBadgeProxy = useCallback(async (userId: string, badgeName: string, reason: string): Promise<void> => {
-         try {
-           await awardGamificationBadge(userId, badgeName, reason); // Service handles persistence
-            // If the action affects the current user, update their context state
-            if (user && user.id === userId) {
-              const updatedStats = await fetchUserStats(userId); // Re-fetch updated stats
-              const updatedUser = { ...user, stats: updatedStats };
-              setUser(updatedUser);
-              sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
-              // Also update the main usersData map in state
-               setUsersData(prevMap => new Map(prevMap).set(user.email, updatedUser));
-            }
-         } catch (error) {
-             console.error(`Context: Failed to award badge: ${error}`);
-              // Optionally show a toast to the user
-         }
-     }, [user]); // Depend on user
 
   // Initial loading state UI
   if (loading) {

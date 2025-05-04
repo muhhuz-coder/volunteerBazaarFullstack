@@ -251,7 +251,7 @@ export async function logHours(userId: string, hours: number, opportunityId: str
  * Helper function to check hour milestones and award badges.
  * Returns the latest stats after potentially awarding badges.
  */
-async function checkAndAwardHourBadges(userId: string, totalHours: number): Promise<VolunteerStats> {
+export async function checkAndAwardHourBadges(userId: string, totalHours: number): Promise<VolunteerStats> {
      let stats = await getUserStats(userId); // Get potentially updated stats
     let awardedNewBadge = false;
 
@@ -287,3 +287,4 @@ export async function recordOpportunityCompletion(userId: string, opportunityId:
    const finalStats = await logHours(userId, hoursVolunteered, opportunityId);
    return finalStats;
 }
+```

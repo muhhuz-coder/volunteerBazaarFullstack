@@ -1,4 +1,4 @@
-'use server';
+
 // src/lib/db-utils.ts
 import path from 'path';
 import type fsType from 'fs/promises'; // Import fs type for type safety
@@ -8,8 +8,30 @@ let fs: typeof fsType; // Declare fs variable
 // Dynamically import fs/promises only when this module is loaded on the server
 async function loadFs() {
     if (!fs) {
-        // Use dynamic import
-        fs = (await import('fs/promises')).default;
+        // Use dynamic import if running on the server
+        if (typeof window === 'undefined') {
+            try {
+                // @ts-ignore - Dynamically import fs/promises
+                fs = (await import('fs/promises'));
+                 // Check if the default export is the module itself
+                 if (fs && typeof fs !== 'object') {
+                    // If import('fs/promises') returns the module directly (ESM style)
+                    // No need for .default
+                 } else if (fs && (fs as any).default) {
+                     // If it returns an object with a default property (CommonJS style or bundled)
+                     fs = (fs as any).default;
+                 } else {
+                    throw new Error("Loaded 'fs/promises' module structure unexpected.");
+                 }
+
+            } catch (e) {
+                console.error("Failed to load 'fs/promises'. This module should only run on the server.", e);
+                // Handle the error appropriately, maybe throw or set a flag
+                throw new Error("Filesystem operations are not available in this environment.");
+            }
+        } else {
+            throw new Error("Filesystem operations cannot be performed in the browser.");
+        }
     }
 }
 
@@ -104,12 +126,16 @@ export function objectToMap<K extends string, V>(obj: Record<K, V>): Map<K, V> {
 
 // Helper for Date serialization/deserialization
 // This function will be used by JSON.parse in readData
-const dateReviver = (key: string, value: any): any => {
+export const dateReviver = (key: string, value: any): any => {
   // Regex to check if the string looks like an ISO date string
-  const dateFormat = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+  const dateFormat = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/; // Allow optional milliseconds
   if (typeof value === 'string' && dateFormat.test(value)) {
     // If it matches, parse it into a Date object
-    return new Date(value);
+    const date = new Date(value);
+    // Optional: Check if the date is valid after parsing
+    if (!isNaN(date.getTime())) {
+        return date;
+    }
   }
   // Otherwise, return the value as is
   return value;
