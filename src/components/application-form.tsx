@@ -20,11 +20,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 // Updated imports: submitApplication -> submitVolunteerApplication, Job -> Opportunity, JobApplication -> VolunteerApplication
-import { type Opportunity, type VolunteerApplication } from '@/services/job-board';
+import type { Opportunity, VolunteerApplication } from '@/services/job-board';
 import { Loader2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext'; // Import useAuth
 
 // Define the validation schema using Zod (adjusted fields/messages)
+// Allow FileList for input type, refine to File for validation
 const formSchema = z.object({
   applicantName: z.string().min(2, {
     message: 'Name must be at least 2 characters.',
@@ -32,20 +33,42 @@ const formSchema = z.object({
   applicantEmail: z.string().email({
     message: 'Please enter a valid email address.',
   }),
-  attachment: z.instanceof(File, { message: 'Attachment is required.' })
-           .refine(file => file.size <= 5 * 1024 * 1024, `Max file size is 5MB.`) // 5MB size limit
-           .refine(
-             file => ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png"].includes(file.type),
-             "Only PDF, DOC, DOCX, JPG, PNG formats are supported."
-           ).optional(), // Made attachment optional
+  attachment: z
+    .custom<FileList>() // Accept FileList from input
+    .optional()
+    .refine(
+      (fileList) => !fileList || fileList.length === 0 || fileList[0].size <= 5 * 1024 * 1024,
+      `Max file size is 5MB.`
+    ) // 5MB size limit
+    .refine(
+      (fileList) =>
+        !fileList ||
+        fileList.length === 0 ||
+        ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png"].includes(fileList[0].type),
+      "Only PDF, DOC, DOCX, JPG, PNG formats are supported."
+    ),
   statementOfInterest: z.string().optional(),
 });
+
 
 type ApplicationFormValues = z.infer<typeof formSchema>;
 
 interface VolunteerApplicationFormProps {
   opportunity: Opportunity;
 }
+
+// Helper function to convert File to Base64 Data URI
+const fileToDataUri = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result as string);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 
 export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFormProps) {
   const { toast } = useToast();
@@ -72,8 +95,8 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
         applicantName: form.formState.dirtyFields.applicantName ? form.getValues('applicantName') : user.displayName || '',
         applicantEmail: form.formState.dirtyFields.applicantEmail ? form.getValues('applicantEmail') : user.email || '',
         statementOfInterest: form.getValues('statementOfInterest'), // Keep existing statement
-        attachment: form.getValues('attachment'), // Keep existing file selection
-      });
+        // Don't reset attachment - managed by user interaction
+      }, { keepValues: true }); // Prevent resetting untouched file input
     }
   }, [user, form]);
 
@@ -91,11 +114,25 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
     setIsSubmitting(true);
     console.log('Submitting volunteer application:', values);
 
-    let attachmentUrl = '';
-    if (values.attachment) {
-        // Simulate file upload -> In a real app, upload and get URL
-        attachmentUrl = `simulated/path/to/${values.attachment.name}`;
-        console.log('Simulated attachment URL:', attachmentUrl);
+    let attachmentDataUri = '';
+    // Get the File object from the FileList
+    const file = values.attachment?.[0];
+
+    if (file) {
+        try {
+          console.log('Converting file to Data URI...');
+          attachmentDataUri = await fileToDataUri(file);
+          console.log('File converted to Data URI (first 100 chars):', attachmentDataUri.substring(0, 100) + '...');
+        } catch (error) {
+          console.error('Error converting file to Data URI:', error);
+          toast({
+            title: 'File Processing Error',
+            description: 'Could not process the attached file. Please try again.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
     }
 
     // Prepare data for the context function
@@ -104,7 +141,7 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
       opportunityTitle: opportunity.title, // Add opportunity title
       applicantName: values.applicantName,
       applicantEmail: values.applicantEmail,
-      resumeUrl: attachmentUrl, // Use the simulated URL
+      resumeUrl: attachmentDataUri, // Use the Data URI string
       coverLetter: values.statementOfInterest || '',
     };
 
@@ -183,33 +220,34 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
         <FormField
           control={form.control}
           name="attachment"
-          render={({ field: { value, onChange, ...fieldProps } }) => (
-            <FormItem>
-              <FormLabel>Relevant Attachment (Optional)</FormLabel>
-              <FormControl>
-                 <div className="relative">
-                    <Input
-                      {...fieldProps} // Pass rest props like name, onBlur, ref
-                      type="file"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                      onChange={(event) => {
-                         // react-hook-form's onChange expects the value, not the event
-                        onChange(event.target.files ? event.target.files[0] : undefined);
-                      }}
-                      // !! REMOVED value prop to fix controlled/uncontrolled warning !!
-                      // File inputs value is read-only and managed by the browser.
-                      className="block w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer bg-background"
-                       disabled={!isVolunteer}
-                    />
-                    {/* Display selected file name (value is the File object) */}
-                    {value?.name && <span className="text-sm text-muted-foreground mt-1 block">{value.name}</span>}
-                    <Upload className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
-                 </div>
-              </FormControl>
-              <FormDescription>Upload a resume, portfolio, or relevant document (PDF, DOC, DOCX, JPG, PNG, max 5MB).</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
+          render={({ field: { onChange, value, ...fieldProps } }) => {
+            // Get the File object from the FileList for display purposes
+            const currentFile = value?.[0];
+            return (
+              <FormItem>
+                <FormLabel>Relevant Attachment (Optional)</FormLabel>
+                <FormControl>
+                   <div className="relative">
+                      <Input
+                        {...fieldProps} // Pass rest props like name, onBlur, ref
+                        type="file"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        // Use the form's register method directly for file inputs
+                        {...form.register("attachment")}
+                        // We don't set `value` for file inputs
+                        className="block w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer bg-background"
+                        disabled={!isVolunteer}
+                      />
+                      {/* Display selected file name */}
+                      {currentFile && <span className="text-sm text-muted-foreground mt-1 block">{currentFile.name}</span>}
+                      <Upload className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+                   </div>
+                </FormControl>
+                <FormDescription>Upload a resume, portfolio, or relevant document (PDF, DOC, DOCX, JPG, PNG, max 5MB).</FormDescription>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
 
 

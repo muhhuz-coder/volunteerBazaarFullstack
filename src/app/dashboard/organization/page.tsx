@@ -10,7 +10,7 @@ import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings } from 'lucide-react'; // Added Briefcase, Settings
+import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download } from 'lucide-react'; // Added Briefcase, Settings, Download
 // Remove direct service imports
 import type { Opportunity, VolunteerApplication } from '@/services/job-board'; // Keep types
 import { useToast } from '@/hooks/use-toast';
@@ -108,6 +108,23 @@ export default function OrganizationDashboard() {
       } finally {
           setProcessingAppId(null);
       }
+  };
+
+  // Function to handle opening the Data URI in a new tab
+  const handleViewAttachment = (dataUri: string) => {
+     if (!dataUri.startsWith('data:')) {
+        toast({ title: "Error", description: "Invalid attachment data.", variant: "destructive" });
+        return;
+     }
+    const win = window.open();
+    if (win) {
+      win.document.write(
+        `<iframe src="${dataUri}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+      );
+      win.document.title = "View Attachment"; // Set a title for the new tab
+    } else {
+      toast({ title: "Popup Blocked", description: "Please allow popups for this site to view attachments.", variant: "destructive" });
+    }
   };
 
 
@@ -252,7 +269,16 @@ export default function OrganizationDashboard() {
                     <CardContent className="text-sm space-y-1 pb-3">
                        <p><span className="font-medium">Email:</span> {app.applicantEmail}</p>
                        {app.coverLetter && <p><span className="font-medium">Statement:</span> {app.coverLetter.substring(0, 100)}{app.coverLetter.length > 100 ? '...' : ''}</p>}
-                       {app.resumeUrl && <p><span className="font-medium">Attachment:</span> <a href={app.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">View Document</a></p>}
+                       {app.resumeUrl && app.resumeUrl.startsWith('data:') ? (
+                         <p className="flex items-center gap-2">
+                           <span className="font-medium">Attachment:</span>
+                           <Button variant="link" size="sm" className="h-auto p-0 text-accent" onClick={() => handleViewAttachment(app.resumeUrl!)}>
+                             <Download className="mr-1 h-4 w-4" /> View Document
+                           </Button>
+                         </p>
+                       ) : app.resumeUrl ? (
+                         <p><span className="font-medium">Attachment:</span> <span className="text-muted-foreground italic">(Invalid or old format)</span></p>
+                       ) : null}
                     </CardContent>
                     <CardFooter className="flex justify-end gap-2 pt-3 border-t">
                       <Button
