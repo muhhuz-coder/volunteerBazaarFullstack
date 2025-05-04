@@ -1,0 +1,162 @@
+// src/app/dashboard/messages/page.tsx
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import { Header } from '@/components/layout/header';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AlertCircle, Inbox, MessageSquare, Users } from 'lucide-react';
+import { Conversation } from '@/services/messaging'; // Import Conversation type
+import { Badge } from '@/components/ui/badge'; // Import Badge
+
+export default function MessagesPage() {
+    const { user, role, loading: authLoading, getUserConversations } = useAuth();
+    const router = useRouter();
+
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [loadingConversations, setLoadingConversations] = useState(true);
+
+    const fetchMessages = useCallback(async () => {
+        if (user) {
+            setLoadingConversations(true);
+            try {
+                const convos = await getUserConversations();
+                setConversations(convos);
+            } catch (error) {
+                console.error("Failed to fetch conversations:", error);
+                // Optionally show a toast message here
+            } finally {
+                setLoadingConversations(false);
+            }
+        }
+    }, [user, getUserConversations]);
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            router.push('/login');
+        } else if (user) {
+            fetchMessages();
+        }
+    }, [user, authLoading, router, fetchMessages]);
+
+    if (authLoading || (user && loadingConversations)) {
+        return (
+            <div className="flex flex-col min-h-screen bg-secondary">
+                <Header />
+                <div className="container mx-auto px-4 py-8 flex-grow">
+                    <Skeleton className="h-8 w-48 mb-6" />
+                    <div className="space-y-4">
+                        {[...Array(3)].map((_, i) => (
+                            <Skeleton key={i} className="h-24 w-full" />
+                        ))}
+                    </div>
+                </div>
+                <footer className="bg-primary p-4 mt-auto">
+                    <Skeleton className="h-4 w-1/3 mx-auto" />
+                </footer>
+            </div>
+        );
+    }
+
+    if (!user) {
+        // Should be redirected by useEffect, but include fallback UI
+        return (
+            <div className="flex flex-col min-h-screen bg-secondary">
+                <Header />
+                <div className="flex-grow flex flex-col justify-center items-center text-center px-4">
+                    <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                    <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
+                    <p className="text-muted-foreground">Redirecting to login...</p>
+                </div>
+                <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+                    <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+                </footer>
+            </div>
+        );
+    }
+
+    // Determine the other party's role for display
+    const getOtherPartyName = (convo: Conversation): string => {
+       if (!user) return "Unknown";
+       if (user.role === 'organization') {
+            // Find volunteer name (assuming volunteer details are included or fetched separately)
+            // For mock, we might need to look up the volunteer in mockUsers
+            const volunteer = Array.from(mockUsers.values()).find(u => u.id === convo.volunteerId);
+            return volunteer?.displayName ?? `Volunteer ID: ${convo.volunteerId}`;
+       } else { // User is volunteer
+            // Find organization name (assuming org details are included or fetched separately)
+             const organization = Array.from(mockUsers.values()).find(u => u.id === convo.organizationId);
+             return organization?.displayName ?? `Org ID: ${convo.organizationId}`;
+       }
+    };
+
+    // (Helper function defined outside component or imported if needed elsewhere)
+     const mockUsers = new Map<string, { id: string; email: string; displayName: string; role: 'volunteer' | 'organization' | null }>();
+     mockUsers.set('organization@example.com', { id: 'org1', email: 'organization@example.com', displayName: 'Helping Hands Org', role: 'organization' });
+     mockUsers.set('volunteer@example.com', { id: 'vol1', email: 'volunteer@example.com', displayName: 'Jane Doe Volunteer', role: 'volunteer' });
+
+
+    return (
+        <div className="flex flex-col min-h-screen bg-secondary">
+            <Header />
+            <div className="container mx-auto px-4 py-8 flex-grow">
+                <h1 className="text-3xl font-bold mb-6 text-primary flex items-center gap-2">
+                    <Inbox className="h-7 w-7" /> Messaging Hub
+                </h1>
+
+                <Card className="shadow-lg border w-full max-w-3xl mx-auto">
+                    <CardHeader>
+                        <CardTitle>Your Conversations</CardTitle>
+                        <CardDescription>Messages related to your volunteer applications and activities.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {conversations.length > 0 ? (
+                            <div className="space-y-4">
+                                {conversations.map((convo) => (
+                                    <Link key={convo.id} href={`/dashboard/messages/${convo.id}`} passHref>
+                                        <div className="block p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h3 className="font-semibold text-lg text-primary">
+                                                   {getOtherPartyName(convo)}
+                                                </h3>
+                                                 <Badge variant={convo.unreadCount && convo.unreadCount > 0 ? "destructive" : "outline"}>
+                                                    {convo.unreadCount && convo.unreadCount > 0 ? `${convo.unreadCount} New` : 'Read'}
+                                                 </Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground mb-2">
+                                                Regarding: {convo.opportunityTitle || 'General Inquiry'}
+                                            </p>
+                                            <p className="text-sm text-foreground truncate">
+                                                 <span className="font-medium">{convo.lastMessage?.senderId === user.id ? 'You:' : ''}</span> {convo.lastMessage?.text ?? 'No messages yet.'}
+                                             </p>
+                                             <p className="text-xs text-muted-foreground text-right mt-1">
+                                                 {convo.lastMessage ? new Date(convo.lastMessage.timestamp).toLocaleString() : ''}
+                                             </p>
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-10">
+                                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                                <p className="text-muted-foreground">No conversations started yet.</p>
+                                {role === 'volunteer' && (
+                                    <Button variant="link" asChild className="mt-2">
+                                        <Link href="/">Find Opportunities</Link>
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+            <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+                <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+            </footer>
+        </div>
+    );
+}

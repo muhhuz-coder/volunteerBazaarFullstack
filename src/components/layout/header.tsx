@@ -2,9 +2,9 @@
 'use client';
 
 import Link from 'next/link';
-// Updated icon
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext'; // Using mock context
+// Updated icon and added MessageSquare, Star
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,18 +14,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // Removed AvatarImage
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Menu } from 'lucide-react'; // For mobile menu
+import { Menu } from 'lucide-react';
 import { useState } from 'react';
+import { Badge } from '@/components/ui/badge'; // Import Badge
 
 export function Header() {
-  const { user, loading, signOut, role } = useAuth(); // Using mock context values
+  const { user, loading, signOut, role, stats: userStats } = useAuth(); // Get stats
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const getInitials = (name?: string | null) => {
@@ -40,12 +41,18 @@ export function Header() {
                       : role === 'volunteer' ? '/dashboard/volunteer'
                       : '/select-role'; // Or '/' if prefer home
 
-  const navLinks = [
-    { href: "/", label: "Opportunities" },
-    { href: "/about", label: "About Us" },
-    { href: "/how-it-works", label: "How It Works" },
-    { href: "/contact", label: "Contact" },
-  ];
+   // Define nav links - conditionally add Messages link
+   const baseNavLinks = [
+     { href: "/", label: "Opportunities" },
+     { href: "/about", label: "About Us" },
+     { href: "/how-it-works", label: "How It Works" },
+     { href: "/contact", label: "Contact" },
+   ];
+
+   const navLinks = user
+     ? [...baseNavLinks, { href: "/dashboard/messages", label: "Messages" }]
+     : baseNavLinks;
+
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
@@ -53,7 +60,6 @@ export function Header() {
     <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-40">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2 text-xl md:text-2xl font-bold">
-           {/* Updated icon and title */}
           <AppIcon className="h-6 w-6 md:h-7 md:w-7" />
           <span>Volunteer Connect</span>
         </Link>
@@ -61,8 +67,14 @@ export function Header() {
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-4">
            {navLinks.map(link => (
-              <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10">
-                <Link href={link.href}>{link.label}</Link>
+              <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10 relative">
+                <Link href={link.href}>
+                   {link.label}
+                   {/* Add unread indicator if needed - requires fetching unread count */}
+                   {/* {link.label === "Messages" && unreadCount > 0 && (
+                     <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-destructive ring-2 ring-primary" />
+                   )} */}
+                </Link>
               </Button>
            ))}
         </nav>
@@ -82,28 +94,45 @@ export function Header() {
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuContent className="w-64" align="end" forceMount> {/* Increased width */}
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
+                    <p className="text-sm font-medium leading-none truncate">
                       {user.displayName || user.email}
                     </p>
-                    <p className="text-xs leading-none text-muted-foreground">
+                    <p className="text-xs leading-none text-muted-foreground truncate">
                       {user.email}
                     </p>
                      <p className="text-xs leading-none text-muted-foreground capitalize pt-1">
                       Role: {role || 'Not Set'}
                     </p>
+                     {/* Display points for volunteers */}
+                     {role === 'volunteer' && user.stats && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
+                           <Star className="h-3 w-3 text-yellow-500" />
+                           <span>{user.stats.points ?? 0} Points</span>
+                         </div>
+                     )}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                  {role ? (
-                    <DropdownMenuItem asChild>
-                       <Link href={dashboardPath}>
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        <span>Dashboard</span>
-                       </Link>
-                    </DropdownMenuItem>
+                    <>
+                     <DropdownMenuItem asChild>
+                        <Link href={dashboardPath}>
+                         <LayoutDashboard className="mr-2 h-4 w-4" />
+                         <span>Dashboard</span>
+                        </Link>
+                     </DropdownMenuItem>
+                     <DropdownMenuItem asChild>
+                         <Link href="/dashboard/messages">
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          <span>Messages</span>
+                          {/* Optional: Add badge for unread count */}
+                          {/* {unreadCount > 0 && <Badge variant="destructive" className="ml-auto">{unreadCount}</Badge>} */}
+                         </Link>
+                      </DropdownMenuItem>
+                     </>
                  ) : (
                      <DropdownMenuItem asChild>
                         <Link href="/select-role">
@@ -155,6 +184,12 @@ export function Header() {
                          <Link href={dashboardPath} className="flex items-center">
                            <LayoutDashboard className="mr-2 h-5 w-5" /> Dashboard
                          </Link>
+                       </Button>
+                       {/* Add messages link to mobile menu if logged in */}
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base" onClick={closeMobileMenu}>
+                          <Link href="/dashboard/messages" className="flex items-center">
+                            <MessageSquare className="mr-2 h-5 w-5" /> Messages
+                          </Link>
                        </Button>
                        <Button variant="destructive" size="sm" className="w-full" onClick={() => { signOut(); closeMobileMenu(); }}>
                          <LogOut className="mr-2 h-4 w-4" /> Log Out
