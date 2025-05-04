@@ -17,6 +17,10 @@ export default function NotFound() {
           <Link href="/">Return to Opportunities</Link>
         </Button>
       </div>
+       {/* Basic Footer */}
+       <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+          <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+       </footer>
     </div>
   );
 }

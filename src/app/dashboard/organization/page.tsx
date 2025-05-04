@@ -44,6 +44,10 @@ export default function OrganizationDashboard() {
              <Skeleton className="h-48 w-full md:col-span-2" />
            </div>
          </div>
+         {/* Basic Footer Skeleton */}
+         <footer className="bg-primary p-4 mt-auto">
+           <Skeleton className="h-4 w-1/3 mx-auto" />
+         </footer>
        </div>
     );
   }
@@ -61,6 +65,10 @@ export default function OrganizationDashboard() {
            <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
            <p className="text-muted-foreground">Redirecting to login...</p>
          </div>
+          {/* Basic Footer */}
+          <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+             <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+          </footer>
        </div>
      );
    }
@@ -81,7 +89,7 @@ export default function OrganizationDashboard() {
           </Button>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
+          <Card className="shadow-md border">
             <CardHeader>
                {/* Updated title and description */}
               <CardTitle>Active Opportunities</CardTitle>
@@ -93,7 +101,7 @@ export default function OrganizationDashboard() {
               {/* Add link or button */}
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-md border">
             <CardHeader>
                {/* Updated title, description, and icon */}
               <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Received Applications</CardTitle>
@@ -105,7 +113,7 @@ export default function OrganizationDashboard() {
                {/* Add link or button */}
             </CardContent>
           </Card>
-           <Card>
+           <Card className="shadow-md border">
              <CardHeader>
                 {/* Updated title, description, and icon */}
                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Organization Profile</CardTitle>
@@ -120,6 +128,10 @@ export default function OrganizationDashboard() {
           {/* Add more relevant cards/widgets for organizations */}
         </div>
       </div>
+       {/* Basic Footer */}
+       <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+          <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+       </footer>
     </div>
   );
 }

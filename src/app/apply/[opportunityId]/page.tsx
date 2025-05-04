@@ -25,7 +25,7 @@ export default async function ApplyPage({ params }: { params: { opportunityId: s
     <div className="flex flex-col min-h-screen bg-secondary">
       <Header />
       <div className="container mx-auto px-4 py-8 flex-grow flex justify-center items-start">
-        <Card className="w-full max-w-2xl shadow-lg">
+        <Card className="w-full max-w-2xl shadow-lg border">
           <CardHeader>
              {/* Updated title and description */}
             <CardTitle className="text-2xl font-bold text-primary">Apply for {opportunity.title}</CardTitle>
@@ -37,7 +37,10 @@ export default async function ApplyPage({ params }: { params: { opportunityId: s
           </CardContent>
         </Card>
       </div>
-      {/* Footer can be added here later */}
+       {/* Basic Footer */}
+       <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+          <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+       </footer>
     </div>
   );
 }

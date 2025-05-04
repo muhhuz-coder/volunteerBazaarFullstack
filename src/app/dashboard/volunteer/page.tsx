@@ -40,6 +40,10 @@ export default function VolunteerDashboard() {
              <Skeleton className="h-48 w-full md:col-span-2" />
            </div>
          </div>
+          {/* Basic Footer Skeleton */}
+         <footer className="bg-primary p-4 mt-auto">
+           <Skeleton className="h-4 w-1/3 mx-auto" />
+         </footer>
        </div>
     );
   }
@@ -57,6 +61,10 @@ export default function VolunteerDashboard() {
            <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
            <p className="text-muted-foreground">Redirecting to login...</p>
          </div>
+          {/* Basic Footer */}
+          <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+             <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+          </footer>
        </div>
      );
    }
@@ -72,7 +80,7 @@ export default function VolunteerDashboard() {
          {/* Updated heading */}
         <h1 className="text-3xl font-bold mb-6 text-primary">Volunteer Dashboard</h1>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
+          <Card className="shadow-md border">
             <CardHeader>
                {/* Updated title, description, and icon */}
               <CardTitle className="flex items-center gap-2"><FileCheck className="h-5 w-5" />My Applications</CardTitle>
@@ -84,7 +92,7 @@ export default function VolunteerDashboard() {
               {/* Add link or button */}
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-md border">
             <CardHeader>
                {/* Updated title, description, and icon */}
               <CardTitle className="flex items-center gap-2"><Heart className="h-5 w-5" />Saved Opportunities</CardTitle>
@@ -96,7 +104,7 @@ export default function VolunteerDashboard() {
                {/* Add link or button */}
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-md border">
             <CardHeader>
                {/* Updated title, description, and icon */}
               <CardTitle className="flex items-center gap-2"><UserCog className="h-5 w-5" />Profile Settings</CardTitle>
@@ -111,6 +119,10 @@ export default function VolunteerDashboard() {
           {/* Add more relevant cards/widgets for volunteers */}
         </div>
       </div>
+       {/* Basic Footer */}
+       <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+          <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+       </footer>
     </div>
   );
 }

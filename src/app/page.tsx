@@ -27,7 +27,10 @@ export default function Home({
           <OpportunityList keywords={keywords} category={category} />
         </Suspense>
       </div>
-      {/* Footer can be added here later */}
+       {/* Basic Footer */}
+       <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+          <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+       </footer>
     </div>
   );
 }
