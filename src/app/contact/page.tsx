@@ -1,4 +1,6 @@
 // src/app/contact/page.tsx
+'use client'; // Add this directive
+
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
