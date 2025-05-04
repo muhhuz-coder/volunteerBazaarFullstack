@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google'; // Switched to Inter for a cleaner sans-serif look
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster'; // Import Toaster
+import { AuthProvider } from '@/context/AuthContext'; // Import AuthProvider
 
 const inter = Inter({
   subsets: ['latin'],
@@ -21,10 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
-        <main className="min-h-screen flex flex-col">
-          {children}
-        </main>
-        <Toaster /> {/* Add Toaster component */}
+        <AuthProvider> {/* Wrap children with AuthProvider */}
+          <main className="min-h-screen flex flex-col">
+            {children}
+          </main>
+          <Toaster /> {/* Add Toaster component */}
+        </AuthProvider>
       </body>
     </html>
   );
