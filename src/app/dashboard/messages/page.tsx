@@ -1,3 +1,4 @@
+
 // src/app/dashboard/messages/page.tsx
 'use client';
 
@@ -12,6 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Inbox, MessageSquare, Users } from 'lucide-react';
 import { Conversation } from '@/services/messaging'; // Import Conversation type
 import { Badge } from '@/components/ui/badge'; // Import Badge
+// Removed direct service import, using AuthContext method which calls server action
+// import { getUserConversationsAction } from '@/actions/messaging-actions'; // Example if not using context
 
 export default function MessagesPage() {
     const { user, role, loading: authLoading, getUserConversations } = useAuth();
@@ -24,8 +27,24 @@ export default function MessagesPage() {
         if (user) {
             setLoadingConversations(true);
             try {
+                // Use the context method which internally calls the server action
                 const convos = await getUserConversations();
-                setConversations(convos);
+                // Convert string dates from server action response if needed
+                 const processedConvos = convos.map(convo => ({
+                    ...convo,
+                    createdAt: typeof convo.createdAt === 'string' ? new Date(convo.createdAt) : convo.createdAt,
+                    updatedAt: typeof convo.updatedAt === 'string' ? new Date(convo.updatedAt) : convo.updatedAt,
+                    lastMessage: convo.lastMessage ? {
+                        ...convo.lastMessage,
+                        timestamp: typeof convo.lastMessage.timestamp === 'string' ? new Date(convo.lastMessage.timestamp) : convo.lastMessage.timestamp,
+                    } : undefined,
+                    // messages array might not be needed in the list view, keeping structure consistent
+                    messages: convo.messages?.map(msg => ({
+                       ...msg,
+                       timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : msg.timestamp,
+                   })) || [],
+                 }));
+                setConversations(processedConvos);
             } catch (error) {
                 console.error("Failed to fetch conversations:", error);
                 // Optionally show a toast message here
@@ -124,7 +143,9 @@ export default function MessagesPage() {
                                              </p>
                                              <p className="text-xs text-muted-foreground text-right mt-1">
                                                  {/* Ensure timestamp is handled correctly */}
-                                                 {convo.lastMessage?.timestamp ? new Date(convo.lastMessage.timestamp).toLocaleString() : ''}
+                                                 {convo.lastMessage?.timestamp instanceof Date
+                                                    ? convo.lastMessage.timestamp.toLocaleString()
+                                                    : 'No date'}
                                              </p>
                                         </div>
                                     </Link>
@@ -150,3 +171,4 @@ export default function MessagesPage() {
         </div>
     );
 }
+

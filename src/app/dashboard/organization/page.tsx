@@ -1,3 +1,4 @@
+
 // src/app/dashboard/organization/page.tsx
 'use client';
 
@@ -10,12 +11,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2 } from 'lucide-react';
-import { getApplicationsForOrganization, updateApplicationStatus, type VolunteerApplication } from '@/services/job-board';
+// Remove direct service imports
+// import { getApplicationsForOrganization, updateApplicationStatus, type VolunteerApplication } from '@/services/job-board';
+import type { VolunteerApplication } from '@/services/job-board'; // Keep type
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge'; // Import Badge
+// Import server actions
+import { getApplicationsForOrganizationAction } from '@/actions/job-board-actions';
+import { acceptVolunteerApplication, rejectVolunteerApplication } from '@/actions/application-actions'; // Updated actions
+
 
 export default function OrganizationDashboard() {
-  const { user, role, loading: authLoading, acceptApplication } = useAuth(); // Use acceptApplication from context
+  // Remove acceptApplication from useAuth, use the server action directly or via a context wrapper if preferred
+  const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -27,17 +35,22 @@ export default function OrganizationDashboard() {
     if (user && role === 'organization') {
       setLoadingApps(true);
       try {
-        // Service function now reads persisted data
-        const fetchedApps = await getApplicationsForOrganization(user.id);
-        setApplications(fetchedApps);
-      } catch (error) {
+        // Call the server action to get applications
+        const fetchedApps = await getApplicationsForOrganizationAction(user.id);
+        // Process dates if they come as strings
+        const processedApps = fetchedApps.map(app => ({
+            ...app,
+            submittedAt: typeof app.submittedAt === 'string' ? new Date(app.submittedAt) : app.submittedAt
+        }));
+        setApplications(processedApps);
+      } catch (error: any) {
         console.error('Failed to fetch applications:', error);
-        toast({ title: 'Error', description: 'Could not load applications.', variant: 'destructive' });
+        toast({ title: 'Error', description: error.message || 'Could not load applications.', variant: 'destructive' });
       } finally {
         setLoadingApps(false);
       }
     }
-  }, [user, role, toast]); // Dependencies for useCallback
+  }, [user, role, toast]);
 
   useEffect(() => {
     if (!authLoading && (!user || role !== 'organization')) {
@@ -50,18 +63,20 @@ export default function OrganizationDashboard() {
   }, [user, role, authLoading, router, fetchApps]);
 
   const handleAccept = async (app: VolunteerApplication) => {
+     if (!user) return; // Should not happen if checks above work
      setProcessingAppId(app.id);
      try {
-        // Use context function (which calls services that handle persistence)
-        const result = await acceptApplication(app.id, app.volunteerId);
+        // Use the server action directly
+        const result = await acceptVolunteerApplication(app.id, app.volunteerId, user.id, user.displayName);
         if (result.success) {
            toast({ title: 'Success', description: `Application accepted. Conversation started.` });
            // Update UI: Change status locally or re-fetch
            setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'accepted' } : a));
-            // Optional redirect handled in context or here if needed
-            // if (result.conversationId) {
-            //    router.push(`/dashboard/messages/${result.conversationId}`);
-            // }
+           // Optional: Fetch latest points/badges for the accepted volunteer if needed elsewhere
+           // Consider navigating to the conversation
+           if (result.conversationId) {
+              router.push(`/dashboard/messages/${result.conversationId}`);
+           }
         } else {
            toast({ title: 'Error', description: result.message, variant: 'destructive' });
         }
@@ -76,11 +91,15 @@ export default function OrganizationDashboard() {
   const handleReject = async (app: VolunteerApplication) => {
       setProcessingAppId(app.id);
       try {
-          // Use the direct service call for rejection (service handles persistence)
-          await updateApplicationStatus(app.id, 'rejected');
-          toast({ title: 'Success', description: `Application rejected.` });
-          // Update UI
-          setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'rejected' } : a));
+          // Use the server action for rejection
+          const result = await rejectVolunteerApplication(app.id);
+           if (result.success) {
+               toast({ title: 'Success', description: `Application rejected.` });
+               // Update UI
+               setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'rejected' } : a));
+           } else {
+               toast({ title: 'Error', description: result.message, variant: 'destructive' });
+           }
       } catch (error: any) {
           console.error('Error rejecting application:', error);
           toast({ title: 'Error', description: 'Failed to process rejection.', variant: 'destructive' });
@@ -137,6 +156,7 @@ export default function OrganizationDashboard() {
       <div className="container mx-auto px-4 py-8 flex-grow">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-primary">Organization Dashboard</h1>
+          {/* TODO: Implement "Post New Opportunity" functionality */}
           <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
             <PlusCircle className="mr-2 h-4 w-4" /> Post New Opportunity
           </Button>
@@ -168,6 +188,7 @@ export default function OrganizationDashboard() {
               </CardHeader>
               <CardContent>
                 <p>Keep your organization details current.</p>
+                 {/* TODO: Link to profile settings page */}
               </CardContent>
             </Card>
         </div>
@@ -188,7 +209,7 @@ export default function OrganizationDashboard() {
                             <CardTitle className="text-lg">{app.applicantName}</CardTitle>
                             <CardDescription>Interested in: {app.opportunityTitle}</CardDescription>
                             {/* Ensure submittedAt is a Date object before formatting */}
-                            <CardDescription>Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : new Date(app.submittedAt).toLocaleDateString()}</CardDescription>
+                            <CardDescription>Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : 'Invalid Date'}</CardDescription>
                          </div>
                           <Badge variant="secondary">{app.status}</Badge>
                       </div>
@@ -243,3 +264,4 @@ export default function OrganizationDashboard() {
     </div>
   );
 }
+

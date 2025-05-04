@@ -1,3 +1,4 @@
+
 // src/app/dashboard/messages/[conversationId]/page.tsx
 'use client';
 
@@ -12,9 +13,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { getConversationDetails, sendMessage, type Conversation, type Message } from '@/services/messaging';
+// Remove direct service imports, use server actions via AuthContext or action imports
+// import { getConversationDetails, sendMessage, type Conversation, type Message } from '@/services/messaging';
+import type { Conversation, Message } from '@/services/messaging'; // Keep types
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+// Import server actions
+import { getConversationDetailsAction, sendMessageAction } from '@/actions/messaging-actions';
+
 
 export default function ConversationPage() {
     const { user, role, loading: authLoading } = useAuth();
@@ -55,20 +61,34 @@ export default function ConversationPage() {
 
 
     const fetchConversationData = useCallback(async () => {
-        if (user && conversationId) {
+        if (user && conversationId && user.role) { // Ensure role is available
             setLoadingConversation(true);
             try {
-                const { conversation: convoDetails, messages: convoMessages } = await getConversationDetails(conversationId, user.id, user.role as 'organization' | 'volunteer');
-                setConversation(convoDetails);
-                setMessages(convoMessages);
-                 // Service function now handles marking as read
-            } catch (error) {
+                // Call the server action to get details
+                const result = await getConversationDetailsAction(conversationId, user.id, user.role);
+                if ('error' in result) {
+                    throw new Error(result.error);
+                }
+                setConversation(result.conversation);
+                // Convert string timestamps back to Date objects if necessary (action might already do this)
+                const processedMessages = result.messages.map(msg => ({
+                    ...msg,
+                    timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : msg.timestamp
+                }));
+                setMessages(processedMessages);
+                 // Server action now handles marking as read
+            } catch (error: any) {
                 console.error("Failed to fetch conversation details:", error);
-                toast({ title: 'Error', description: 'Could not load conversation.', variant: 'destructive' });
+                toast({ title: 'Error', description: error.message || 'Could not load conversation.', variant: 'destructive' });
                  setConversation(null); // Ensure conversation is null on error
             } finally {
                 setLoadingConversation(false);
             }
+        } else if (user && !user.role) {
+             console.error("User role not set, cannot fetch conversation details.");
+             toast({ title: 'Error', description: 'User role not set.', variant: 'destructive' });
+             setLoadingConversation(false);
+             setConversation(null);
         }
     }, [user, conversationId, toast]); // Removed router dependency as it's not used in fetch logic
 
@@ -95,14 +115,23 @@ export default function ConversationPage() {
 
         setIsSending(true);
         try {
-             // Service function now handles persistence
-            const sentMessage = await sendMessage(conversationId, user.id, newMessage.trim());
-             // The service returns the message with a Date object
-            setMessages(prev => [...prev, sentMessage]); // Add new message
-            setNewMessage(''); // Clear input
-        } catch (error) {
+             // Call the server action to send the message
+             const result = await sendMessageAction(conversationId, user.id, newMessage.trim());
+
+             if (result.success && result.message) {
+                 // Convert string timestamp back to Date if necessary
+                 const sentMessage = {
+                     ...result.message,
+                     timestamp: typeof result.message.timestamp === 'string' ? new Date(result.message.timestamp) : result.message.timestamp
+                 };
+                 setMessages(prev => [...prev, sentMessage]); // Add new message
+                 setNewMessage(''); // Clear input
+             } else {
+                 throw new Error(result.error || 'Failed to send message.');
+             }
+        } catch (error: any) {
             console.error("Failed to send message:", error);
-            toast({ title: 'Error', description: 'Could not send message.', variant: 'destructive' });
+            toast({ title: 'Error', description: error.message || 'Could not send message.', variant: 'destructive' });
         } finally {
             setIsSending(false);
         }
@@ -228,7 +257,7 @@ export default function ConversationPage() {
                                           {/* Ensure timestamp is a Date object */}
                                          {msg.timestamp instanceof Date
                                              ? msg.timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                                             : new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) // Fallback parsing
+                                             : 'Invalid Date' // Handle cases where it might still not be a date
                                          }
                                      </p>
                                 </div>

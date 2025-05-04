@@ -9,13 +9,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { VolunteerApplication } from '@/services/job-board';
 import type { Conversation } from '@/services/messaging';
 import type { VolunteerStats } from '@/services/gamification';
-// Import persistence utils
-import { readData, writeData, mapToObject, objectToMap } from '@/lib/db-utils';
+// Import persistence utils - We should avoid using fs-dependent utils directly on the client
+// import { readData, writeData, mapToObject, objectToMap } from '@/lib/db-utils';
 
 // Import service functions that interact with persisted data
 import {
   getConversationsForUser as fetchConversations,
   createConversation as createNewConversation,
+  getConversationDetails as fetchConversationDetails, // Needed for type
+  sendMessage as postMessage, // Needed for type
 } from '@/services/messaging';
 import {
   getUserStats as fetchUserStats,
@@ -25,8 +27,15 @@ import {
 } from '@/services/gamification';
 import {
     submitVolunteerApplication as postApplication,
-    updateApplicationStatus as updateAppStatus // Import for acceptApplication
+    updateApplicationStatus as updateAppStatus, // Import for acceptApplication
+    getApplicationsForOrganization as fetchOrgApplications, // Needed for type
+    getApplicationsForVolunteer as fetchVolunteerApplications, // Needed for type
 } from '@/services/job-board';
+// Import server actions that will handle data persistence
+import { signInUser, signUpUser, updateUserRole } from '@/actions/auth-actions';
+import { acceptVolunteerApplication, submitVolunteerApplicationAction } from '@/actions/application-actions';
+import { addPointsAction, awardBadgeAction } from '@/actions/gamification-actions';
+import { getUserConversationsAction } from '@/actions/messaging-actions';
 
 
 export type UserRole = 'volunteer' | 'organization' | null;
@@ -46,12 +55,12 @@ interface AuthContextType {
   signIn: (email: string, pass: string) => Promise<{ success: boolean; message: string; role?: UserRole | null }>;
   signUp: (email: string, pass: string, name: string, role: UserRole) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
-  setRoleAndUpdateUser: (role: UserRole) => Promise<void>;
+  setRoleAndUpdateUser: (role: UserRole) => Promise<{ success: boolean; message: string }>;
   submitApplication: (application: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>) => Promise<{ success: boolean; message: string }>;
   acceptApplication: (applicationId: string, volunteerId: string) => Promise<{ success: boolean; message: string; conversationId?: string }>;
   getUserConversations: () => Promise<Conversation[]>;
-  addPoints: (userId: string, points: number, reason: string) => Promise<void>;
-  awardBadge: (userId: string, badgeName: string, reason: string) => Promise<void>;
+  addPoints: (userId: string, points: number, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
+  awardBadge: (userId: string, badgeName: string, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,179 +69,92 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const USERS_FILE = 'users.json'; // Define the users data file
-
 // Simulate API delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// --- Load User Data ---
-// Use state to manage the user map, loaded asynchronously
-let isDataLoaded = false; // Flag to prevent multiple initial loads
 
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true); // Start loading until data is checked/loaded
+  const [loading, setLoading] = useState(true); // Start loading until session is checked
   const [role, setRole] = useState<UserRole>(null);
-  const [usersData, setUsersData] = useState<Map<string, UserProfile>>(new Map());
+  // We no longer load the full usersData map on the client
+  // const [usersData, setUsersData] = useState<Map<string, UserProfile>>(new Map());
   const router = useRouter();
 
-  // Load user data on initial mount
+  // Check session storage on initial client mount
   useEffect(() => {
-    async function loadUsers() {
-        if (isDataLoaded) return; // Prevent re-loading if already done
-        console.log('AuthProvider: Loading initial user data...');
-        let usersObject: Record<string, UserProfile> = {};
+    console.log('AuthProvider: Checking sessionStorage for existing session.');
+    setLoading(true);
+    const storedUser = sessionStorage.getItem('loggedInUser');
+    if (storedUser) {
         try {
-            usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
-            const loadedUsersMap = objectToMap(usersObject);
-            // Fetch initial stats for default users if they exist
-            for (const [email, profile] of loadedUsersMap.entries()) {
-                if (profile.role === 'volunteer' && !profile.stats) {
-                    try {
-                        const stats = await fetchUserStats(profile.id); // Fetch stats if missing
-                        profile.stats = stats;
-                        loadedUsersMap.set(email, profile); // Update map
-                    } catch (statsError) {
-                        console.error(`AuthProvider: Failed to fetch initial stats for volunteer ${profile.id}:`, statsError);
-                        // Assign default stats if fetch fails to avoid missing stats property
-                        profile.stats = { points: 0, badges: [], hours: 0 };
-                        loadedUsersMap.set(email, profile);
-                    }
-                }
-            }
-            setUsersData(loadedUsersMap);
-            console.log('AuthProvider: User data loaded successfully.', loadedUsersMap);
-            isDataLoaded = true; // Mark as loaded
-        } catch (error) {
-            console.error('AuthProvider: Failed to load user data:', error);
-            // Handle error appropriately, maybe show an error state
-        } finally {
-            // Check for session storage persistence (simple example)
-            const storedUser = sessionStorage.getItem('loggedInUser');
-            if (storedUser) {
-                try {
-                    const parsedUser: UserProfile = JSON.parse(storedUser);
-                    // Optional: Re-validate user against loaded data
-                     if (usersObject[parsedUser.email]) { // Check if user still exists in loaded data
-                        // Ensure stats are loaded if they were fetched after session was stored
-                        if (parsedUser.role === 'volunteer' && !parsedUser.stats) {
-                            const liveUser = usersData.get(parsedUser.email);
-                            if (liveUser && liveUser.stats) {
-                                parsedUser.stats = liveUser.stats;
-                            }
-                        }
-                        setUser(parsedUser);
-                        setRole(parsedUser.role);
-                        console.log('AuthProvider: Restored user session from sessionStorage.', parsedUser);
-                     } else {
-                        sessionStorage.removeItem('loggedInUser'); // Clear invalid session
-                     }
-                } catch (e) {
-                    console.error("AuthProvider: Error parsing stored user session.", e);
-                    sessionStorage.removeItem('loggedInUser');
-                }
-            }
-             setLoading(false); // Finish loading state
+            const parsedUser: UserProfile = JSON.parse(storedUser);
+            setUser(parsedUser);
+            setRole(parsedUser.role);
+            console.log('AuthProvider: Restored user session from sessionStorage.', parsedUser);
+        } catch (e) {
+            console.error("AuthProvider: Error parsing stored user session.", e);
+            sessionStorage.removeItem('loggedInUser');
         }
+    } else {
+        console.log('AuthProvider: No user session found in sessionStorage.');
     }
-    loadUsers();
-  }, [usersData]); // Depend on usersData to ensure stats are loaded after initial load
+    setLoading(false); // Finish loading check
+  }, []); // Run only once on mount
 
   // --- Auth Methods ---
   const signIn = useCallback(async (email: string, pass: string): Promise<{ success: boolean; message: string; role?: UserRole | null }> => {
     console.log('Attempting sign in for:', email);
     setLoading(true);
-    await sleep(500);
+    try {
+        // Call the server action
+        const result = await signInUser(email, pass);
 
-    if (!isDataLoaded) {
+        if (result.success && result.user) {
+            setUser(result.user);
+            setRole(result.user.role);
+            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user)); // Persist session simply
+            console.log('Sign in successful via server action:', result.user);
+            return { success: true, message: result.message, role: result.user.role };
+        } else {
+            console.log('Sign in failed via server action:', result.message);
+            return { success: false, message: result.message || 'Invalid credentials.' };
+        }
+    } catch (error: any) {
+        console.error("Sign in process failed:", error);
+        return { success: false, message: error.message || 'An unexpected error occurred during login.' };
+    } finally {
         setLoading(false);
-        return { success: false, message: 'User data not loaded yet. Please try again.' };
     }
-
-    const existingUser = usersData.get(email);
-
-    if (existingUser) {
-      // Simulate password check (in real app, hash compare on backend)
-      // For mock, just check if user exists
-      let userToSet = existingUser;
-      if (existingUser.role === 'volunteer' && !existingUser.stats) { // Also check if stats are missing
-          try {
-             const stats = await fetchUserStats(existingUser.id);
-             userToSet = { ...existingUser, stats };
-             // Update map in state (will trigger re-render if needed)
-             setUsersData(prevMap => new Map(prevMap).set(email, userToSet));
-          } catch (statsError) {
-             console.error(`AuthProvider (signIn): Failed to fetch stats for volunteer ${existingUser.id}:`, statsError);
-             // Assign default stats if fetch fails
-             userToSet = { ...existingUser, stats: { points: 0, badges: [], hours: 0 } };
-             setUsersData(prevMap => new Map(prevMap).set(email, userToSet));
-          }
-      }
-
-      setUser(userToSet);
-      setRole(userToSet.role);
-      sessionStorage.setItem('loggedInUser', JSON.stringify(userToSet)); // Persist session simply
-      setLoading(false);
-      console.log('Sign in successful:', userToSet);
-      return { success: true, message: 'Login successful!', role: userToSet.role };
-    } else {
-      setLoading(false);
-      console.log('Sign in failed: User not found');
-      return { success: false, message: 'Invalid email or password.' };
-    }
-  }, [usersData]); // Depend on usersData
+  }, []);
 
   const signUp = useCallback(async (email: string, pass: string, name: string, roleToSet: UserRole): Promise<{ success: boolean; message: string }> => {
      console.log('Attempting sign up for:', email, 'with role:', roleToSet);
     if (!roleToSet) {
         return { success: false, message: 'Role is required for signup.' };
     }
-    if (!isDataLoaded) {
-        return { success: false, message: 'User data not loaded yet. Please try again.' };
-    }
-
     setLoading(true);
-    await sleep(500);
-
-    if (usersData.has(email)) {
-      setLoading(false);
-      console.log('Sign up failed: Email already exists');
-      return { success: false, message: 'Email already in use.' };
-    }
-
-    const userId = roleToSet === 'organization' ? `org${usersData.size + 1}` : `vol${usersData.size + 1}`;
-    const newUser: UserProfile = {
-      id: userId,
-      email: email,
-      displayName: name,
-      role: roleToSet,
-      stats: roleToSet === 'volunteer' ? { points: 0, badges: [], hours: 0 } : undefined, // Initialize stats for volunteers
-    };
-
-    // Update state and save to file
-    const updatedUsersMap = new Map(usersData).set(email, newUser);
-    setUsersData(updatedUsersMap);
     try {
-        await writeData(USERS_FILE, mapToObject(updatedUsersMap));
-        // If volunteer, potentially initialize stats file if needed (gamification service might handle this)
-        if (newUser.role === 'volunteer') {
-            // Initialization of stats file happens implicitly when getUserStats is called or points/badges are added
+        // Call the server action
+        const result = await signUpUser(email, pass, name, roleToSet);
+
+        if (result.success && result.user) {
+            setUser(result.user);
+            setRole(result.user.role);
+            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user)); // Persist session
+            console.log('Sign up successful via server action:', result.user);
+            return { success: true, message: result.message };
+        } else {
+            console.log('Sign up failed via server action:', result.message);
+            return { success: false, message: result.message || 'Signup failed.' };
         }
-        setUser(newUser);
-        setRole(newUser.role);
-        sessionStorage.setItem('loggedInUser', JSON.stringify(newUser)); // Persist session
+    } catch (error: any) {
+        console.error("Sign up process failed:", error);
+        return { success: false, message: error.message || 'An unexpected error occurred during signup.' };
+    } finally {
         setLoading(false);
-        console.log('Sign up successful and data saved:', newUser);
-        return { success: true, message: 'Signup successful!' };
-    } catch (error) {
-         setLoading(false);
-         // Revert state update if save failed?
-         setUsersData(usersData);
-         console.error('Sign up failed during data save:', error);
-         return { success: false, message: 'Signup failed due to a server error.' };
     }
-  }, [usersData]); // Depend on usersData
+  }, []);
 
   const signOut = useCallback(async () => {
     console.log('Signing out');
@@ -242,82 +164,86 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setRole(null);
     sessionStorage.removeItem('loggedInUser'); // Clear session
     setLoading(false);
-     router.push('/');
-     console.log('Sign out complete');
+    router.push('/'); // Redirect to home
+    console.log('Sign out complete');
   }, [router]);
 
-  const setRoleAndUpdateUser = useCallback(async (roleToSet: UserRole) => {
+  const setRoleAndUpdateUser = useCallback(async (roleToSet: UserRole): Promise<{ success: boolean; message: string }> => {
      if (!user) {
        console.error("Cannot set role: No user logged in.");
-       return;
+       return { success: false, message: 'User not logged in.' };
      }
-      if (!roleToSet) {
+     if (!roleToSet) {
          console.error("Cannot set role: Role is null or undefined.");
-         return;
-      }
-     setLoading(true);
-     await sleep(300);
-
-     const updatedUser: UserProfile = { ...user, role: roleToSet };
-
-     // Update state and save to file
-     const updatedUsersMap = new Map(usersData).set(user.email, updatedUser);
-     setUsersData(updatedUsersMap);
-     try {
-        await writeData(USERS_FILE, mapToObject(updatedUsersMap));
-        setUser(updatedUser);
-        setRole(roleToSet);
-        sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update persisted session
-        setLoading(false);
-        console.log(`Role updated to ${roleToSet} for user ${user.email} and data saved.`);
-     } catch (error) {
-        setLoading(false);
-        // Revert state update if save failed?
-        setUsersData(usersData);
-        console.error('Failed to save role update:', error);
-        throw new Error('Failed to update role.'); // Propagate error
+         return { success: false, message: 'Invalid role selected.' };
      }
-   }, [user, usersData]); // Depend on user and usersData
-
-   // --- Gamification Methods (Call Service Functions) ---
-   const addPointsProxy = useCallback(async (userId: string, points: number, reason: string): Promise<void> => {
-       try {
-         await addGamificationPoints(userId, points, reason); // Service handles persistence
-          // If the action affects the current user, update their context state
-          if (user && user.id === userId) {
-            const updatedStats = await fetchUserStats(userId); // Re-fetch updated stats
-            const updatedUser = { ...user, stats: updatedStats };
-            setUser(updatedUser);
-            sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
-            // Also update the main usersData map in state
-             setUsersData(prevMap => new Map(prevMap).set(user.email, updatedUser));
-          }
-       } catch (error) {
-           console.error(`Context: Failed to add points: ${error}`);
-           // Optionally show a toast to the user
-       }
-   }, [user]); // Depend on user
-
-    const awardBadgeProxy = useCallback(async (userId: string, badgeName: string, reason: string): Promise<void> => {
-        try {
-          await awardGamificationBadge(userId, badgeName, reason); // Service handles persistence
-           // If the action affects the current user, update their context state
-           if (user && user.id === userId) {
-             const updatedStats = await fetchUserStats(userId); // Re-fetch updated stats
-             const updatedUser = { ...user, stats: updatedStats };
-             setUser(updatedUser);
-             sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
-             // Also update the main usersData map in state
-              setUsersData(prevMap => new Map(prevMap).set(user.email, updatedUser));
-           }
-        } catch (error) {
-            console.error(`Context: Failed to award badge: ${error}`);
-             // Optionally show a toast to the user
+     setLoading(true);
+     try {
+        // Call the server action
+        const result = await updateUserRole(user.id, roleToSet);
+        if (result.success && result.user) {
+            setUser(result.user);
+            setRole(result.user.role);
+            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user)); // Update persisted session
+            console.log(`Role updated to ${roleToSet} for user ${user.email} via server action.`);
+            return { success: true, message: result.message };
+        } else {
+            console.error('Failed to update role via server action:', result.message);
+            return { success: false, message: result.message || 'Failed to update role.'};
         }
-    }, [user]); // Depend on user
+     } catch (error: any) {
+        console.error('Failed to set role:', error);
+        return { success: false, message: error.message || 'Failed to update role.'};
+     } finally {
+        setLoading(false);
+     }
+   }, [user]);
+
+   // --- Gamification Methods (Call Server Actions) ---
+   const addPointsProxy = useCallback(async (userId: string, points: number, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
+       try {
+         const result = await addPointsAction(userId, points, reason); // Server action handles persistence
+         if (result.success) {
+             // If the action affects the current user, update their context state
+             if (user && user.id === userId && result.newStats) {
+               const updatedUser = { ...user, stats: result.newStats };
+               setUser(updatedUser);
+               sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
+             }
+             return { success: true, newStats: result.newStats };
+         } else {
+             console.error(`Context: Failed to add points: ${result.message}`);
+             return { success: false };
+         }
+       } catch (error: any) {
+           console.error(`Context: Failed to add points: ${error.message}`);
+           return { success: false };
+       }
+   }, [user]);
+
+    const awardBadgeProxy = useCallback(async (userId: string, badgeName: string, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
+        try {
+          const result = await awardBadgeAction(userId, badgeName, reason); // Server action handles persistence
+          if (result.success) {
+              // If the action affects the current user, update their context state
+              if (user && user.id === userId && result.newStats) {
+                  const updatedUser = { ...user, stats: result.newStats };
+                  setUser(updatedUser);
+                  sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
+              }
+              return { success: true, newStats: result.newStats };
+          } else {
+               console.error(`Context: Failed to award badge: ${result.message}`);
+               return { success: false };
+          }
+        } catch (error: any) {
+            console.error(`Context: Failed to award badge: ${error.message}`);
+            return { success: false };
+        }
+    }, [user]);
 
 
-  // --- Feature Methods (Rely on Service Functions) ---
+  // --- Feature Methods (Call Server Actions) ---
 
   const submitApplication = useCallback(async (applicationData: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>): Promise<{ success: boolean; message: string }> => {
     if (!user || user.role !== 'volunteer') {
@@ -325,23 +251,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
     setLoading(true); // Indicate processing
     try {
-      // The service function now handles persistence
-      const resultMessage = await postApplication({
-          ...applicationData,
-          volunteerId: user.id,
-          status: 'submitted', // Service should handle this, but setting here for clarity
-      });
+      // Call the server action for submitting the application
+      const submitResult = await submitVolunteerApplicationAction(applicationData, user.id, user.displayName || user.email); // Pass volunteer details
 
-      // Award points using the context method (which calls the service)
-      await addPointsProxy(user.id, 5, `Applied for opportunity: ${applicationData.opportunityTitle}`); // Use addPointsProxy
+      if (submitResult.success) {
+        // Award points using the context method (which calls the server action)
+        await addPointsProxy(user.id, 5, `Applied for opportunity: ${applicationData.opportunityTitle}`);
+        return { success: true, message: submitResult.message };
+      } else {
+         return { success: false, message: submitResult.message || 'Application submission failed.' };
+      }
 
-      setLoading(false);
-      return { success: true, message: resultMessage };
     } catch (error: any) {
-      setLoading(false);
       return { success: false, message: error.message || 'Application submission failed.' };
+    } finally {
+      setLoading(false);
     }
-  }, [user, addPointsProxy]); // Include addPointsProxy in dependencies
+  }, [user, addPointsProxy]);
 
   const acceptApplication = useCallback(async (applicationId: string, volunteerId: string): Promise<{ success: boolean; message: string; conversationId?: string }> => {
      if (!user || user.role !== 'organization') {
@@ -349,48 +275,42 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
      }
      setLoading(true);
      try {
-       // 1. Update application status via service
-        const updatedApp = await updateAppStatus(applicationId, 'accepted');
+        // Call the server action to handle accepting the application
+        const result = await acceptVolunteerApplication(applicationId, volunteerId, user.id, user.displayName);
 
-       // 2. Award points to volunteer via context method
-        await addPointsProxy(volunteerId, 50, `Accepted for opportunity: ${updatedApp.opportunityTitle}`); // Use addPointsProxy
-
-       // 3. Create conversation via service
-        const conversation = await createNewConversation({
-           organizationId: user.id,
-           volunteerId: volunteerId,
-           opportunityId: updatedApp.opportunityId,
-           opportunityTitle: updatedApp.opportunityTitle, // Pass title
-           organizationName: user.displayName, // Pass org name
-           volunteerName: updatedApp.applicantName, // Pass volunteer name
-           initialMessage: `Congratulations! Your application for "${updatedApp.opportunityTitle}" has been accepted. Let's coordinate next steps.`,
-        });
-
-
-       setLoading(false);
-       return { success: true, message: 'Application accepted and conversation started.', conversationId: conversation.id };
+        if (result.success) {
+             // Award points to the volunteer via the context method (calling the server action)
+            if (result.updatedApp) {
+                await addPointsProxy(volunteerId, 50, `Accepted for opportunity: ${result.updatedApp.opportunityTitle}`);
+            }
+            return { success: true, message: result.message, conversationId: result.conversationId };
+        } else {
+            console.error("Error accepting application via action:", result.message);
+            return { success: false, message: result.message || 'Failed to accept application.' };
+        }
      } catch (error: any) {
-       setLoading(false);
        console.error("Error accepting application:", error);
        return { success: false, message: error.message || 'Failed to accept application.' };
+     } finally {
+       setLoading(false);
      }
-   }, [user, addPointsProxy]); // Include addPointsProxy dependency
+   }, [user, addPointsProxy]);
 
     const getUserConversations = useCallback(async (): Promise<Conversation[]> => {
-        if (!user || !user.role) { // Check role exists
+        if (!user || !user.role) {
           console.error("Cannot get conversations: User not logged in or role not set.");
           return [];
         }
         // setLoading(true); // Optional: Show loading specifically for conversation fetch
         try {
-          // Service function reads persisted data
-          const conversations = await fetchConversations(user.id, user.role);
-          // setLoading(false);
+          // Call the server action
+          const conversations = await getUserConversationsAction(user.id, user.role);
           return conversations;
         } catch (error: any) {
-          console.error("Failed to fetch conversations:", error);
-          // setLoading(false);
+          console.error("Failed to fetch conversations via action:", error);
           return []; // Return empty on error
+        } finally {
+             // setLoading(false);
         }
       }, [user]);
 

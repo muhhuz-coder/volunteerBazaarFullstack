@@ -1,3 +1,4 @@
+
 // src/app/dashboard/volunteer/page.tsx
 'use client';
 
@@ -9,11 +10,17 @@ import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, FileCheck, Heart, UserCog, MessageSquare, Star, Medal, Trophy } from 'lucide-react';
-import { getApplicationsForVolunteer, type VolunteerApplication } from '@/services/job-board';
-import { getLeaderboard, type LeaderboardEntry } from '@/services/gamification'; // Service now reads persisted data
+// Remove direct service imports
+// import { getApplicationsForVolunteer, type VolunteerApplication } from '@/services/job-board';
+// import { getLeaderboard, type LeaderboardEntry } from '@/services/gamification';
+import type { VolunteerApplication } from '@/services/job-board'; // Keep type
+import type { LeaderboardEntry } from '@/services/gamification'; // Keep type
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+// Import server actions
+import { getApplicationsForVolunteerAction } from '@/actions/job-board-actions';
+import { getLeaderboardAction } from '@/actions/gamification-actions'; // Assuming this action exists
 
 
 export default function VolunteerDashboard() {
@@ -27,33 +34,38 @@ export default function VolunteerDashboard() {
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
 
 
-  // Fetch applications for the volunteer using the service
+  // Fetch applications for the volunteer using the server action
   const fetchApps = useCallback(async () => {
     if (user && role === 'volunteer') {
       setLoadingApps(true);
       try {
-        // Service function now reads persisted data
-        const fetchedApps = await getApplicationsForVolunteer(user.id);
-        setApplications(fetchedApps);
-      } catch (error) {
+        // Call the server action
+        const fetchedApps = await getApplicationsForVolunteerAction(user.id);
+        // Process dates if they come as strings
+        const processedApps = fetchedApps.map(app => ({
+            ...app,
+            submittedAt: typeof app.submittedAt === 'string' ? new Date(app.submittedAt) : app.submittedAt
+        }));
+        setApplications(processedApps);
+      } catch (error: any) {
         console.error('Failed to fetch applications:', error);
-        toast({ title: 'Error', description: 'Could not load your applications.', variant: 'destructive' });
+        toast({ title: 'Error', description: error.message || 'Could not load your applications.', variant: 'destructive' });
       } finally {
         setLoadingApps(false);
       }
     }
   }, [user, role, toast]);
 
-  // Fetch leaderboard data using the service
+  // Fetch leaderboard data using the server action
    const fetchLeaderboardData = useCallback(async () => {
      setLoadingLeaderboard(true);
      try {
-        // Service function now reads persisted data
-       const data = await getLeaderboard();
+        // Call the server action
+       const data = await getLeaderboardAction(); // Assumes getLeaderboardAction exists
        setLeaderboard(data);
-     } catch (error) {
+     } catch (error: any) {
        console.error('Failed to fetch leaderboard:', error);
-       toast({ title: 'Error', description: 'Could not load leaderboard.', variant: 'destructive' });
+       toast({ title: 'Error', description: error.message || 'Could not load leaderboard.', variant: 'destructive' });
      } finally {
        setLoadingLeaderboard(false);
      }
@@ -187,7 +199,7 @@ export default function VolunteerDashboard() {
                       <div>
                         <p className="font-medium">{app.opportunityTitle}</p>
                         {/* Ensure submittedAt is a Date object before formatting */}
-                        <p className="text-sm text-muted-foreground">Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : new Date(app.submittedAt).toLocaleDateString()}</p>
+                        <p className="text-sm text-muted-foreground">Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : 'Invalid Date'}</p>
                       </div>
                       <Badge variant={
                          app.status === 'accepted' ? 'default' : app.status === 'rejected' ? 'destructive' : 'secondary'

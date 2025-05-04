@@ -1,11 +1,13 @@
+
 import { Header } from '@/components/layout/header';
-// Updated imports: JobSearch -> OpportunitySearch, JobList -> OpportunityList
 import { OpportunitySearch } from '@/components/job-search';
 import { OpportunityList } from '@/components/job-list';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+// Import the server action
+import { getOpportunitiesAction } from '@/actions/job-board-actions';
 
-export default function Home({
+export default async function Home({ // Make the component async
   searchParams,
 }: {
   searchParams?: {
@@ -16,18 +18,25 @@ export default function Home({
   const keywords = searchParams?.keywords || '';
   const category = searchParams?.category || '';
 
+  // Fetch opportunities using the server action
+  // This now happens on the server during the request/build time
+  const opportunities = await getOpportunitiesAction(keywords, category);
+
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
       <Header />
       <div className="container mx-auto px-4 py-8 flex-grow">
-         {/* Use OpportunitySearch component */}
         <OpportunitySearch initialKeywords={keywords} initialCategory={category} />
+         {/*
+           OpportunityList now receives the fetched data directly.
+           Suspense might not be strictly necessary here if the data fetching
+           is fast enough during SSR, but keeping it doesn't hurt.
+           Alternatively, remove Suspense and pass opportunities directly.
+         */}
         <Suspense fallback={<OpportunityListSkeleton />}>
-           {/* Use OpportunityList component and pass props */}
-          <OpportunityList keywords={keywords} category={category} />
+          <OpportunityList initialOpportunities={opportunities} keywords={keywords} category={category} />
         </Suspense>
       </div>
-       {/* Basic Footer */}
        <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
           <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
        </footer>
@@ -40,14 +49,12 @@ function OpportunityListSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
       {[...Array(6)].map((_, i) => (
-         // Kept the structure, adjusted text skeletons slightly if needed
         <div key={i} className="bg-card p-6 rounded-lg shadow-md border">
           <Skeleton className="h-6 w-3/4 mb-2" />
           <Skeleton className="h-4 w-1/2 mb-4" />
           <Skeleton className="h-4 w-full mb-2" />
           <Skeleton className="h-4 w-full mb-2" />
           <Skeleton className="h-4 w-2/3 mb-4" />
-          {/* Adjusted skeleton for button text */}
           <Skeleton className="h-5 w-32" />
         </div>
       ))}
