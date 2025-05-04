@@ -15,7 +15,7 @@ import type { VolunteerStats } from '@/services/gamification';
 // Services are generally called via Server Actions now
 
 // Import server actions that will handle data persistence
-import { signInUser, signUpUser, updateUserRole } from '@/actions/auth-actions';
+import { signInUser, signUpUser, updateUserRole, getRefreshedUserAction } from '@/actions/auth-actions'; // Added getRefreshedUserAction
 import { acceptVolunteerApplication, rejectVolunteerApplication, submitVolunteerApplicationAction } from '@/actions/application-actions'; // Added reject action
 import { addPointsAction, awardBadgeAction } from '@/actions/gamification-actions';
 import { getUserConversationsAction, startConversationAction } from '@/actions/messaging-actions'; // Added startConversationAction
@@ -73,25 +73,49 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [role, setRole] = useState<UserRole>(null);
   const router = useRouter();
 
-  // Check session storage on initial client mount
+  // Check session storage on initial client mount and refresh user data
   useEffect(() => {
-    console.log('AuthProvider: Checking sessionStorage for existing session.');
-    setLoading(true);
-    const storedUser = sessionStorage.getItem('loggedInUser');
-    if (storedUser) {
-        try {
-            const parsedUser: UserProfile = JSON.parse(storedUser);
-            setUser(parsedUser);
-            setRole(parsedUser.role);
-            console.log('AuthProvider: Restored user session from sessionStorage.', parsedUser);
-        } catch (e) {
-            console.error("AuthProvider: Error parsing stored user session.", e);
-            sessionStorage.removeItem('loggedInUser');
+    const restoreSession = async () => {
+        console.log('AuthProvider: Checking sessionStorage for existing session.');
+        setLoading(true);
+        const storedUser = sessionStorage.getItem('loggedInUser');
+        if (storedUser) {
+            try {
+                const parsedUser: UserProfile = JSON.parse(storedUser);
+                // Immediately set basic user info to reduce initial loading time
+                setUser(parsedUser);
+                setRole(parsedUser.role);
+                console.log('AuthProvider: Restored basic user session from sessionStorage.', parsedUser);
+
+                // Now, fetch the refreshed user data (including latest stats) from the server
+                console.log(`AuthProvider: Refreshing user data for ${parsedUser.id} from server.`);
+                const refreshResult = await getRefreshedUserAction(parsedUser.id);
+                if (refreshResult.success && refreshResult.user) {
+                    setUser(refreshResult.user); // Update with fresh data
+                    setRole(refreshResult.user.role); // Update role just in case
+                    sessionStorage.setItem('loggedInUser', JSON.stringify(refreshResult.user)); // Update storage
+                    console.log('AuthProvider: Successfully refreshed user session from server.', refreshResult.user);
+                } else {
+                    console.warn('AuthProvider: Failed to refresh user session from server. Using stored data.', refreshResult.message);
+                    // Optionally sign out if refresh fails critically
+                    // await signOut();
+                }
+
+            } catch (e) {
+                console.error("AuthProvider: Error processing stored user session.", e);
+                sessionStorage.removeItem('loggedInUser');
+                setUser(null);
+                setRole(null);
+            }
+        } else {
+            console.log('AuthProvider: No user session found in sessionStorage.');
+            setUser(null);
+            setRole(null);
         }
-    } else {
-        console.log('AuthProvider: No user session found in sessionStorage.');
-    }
-    setLoading(false); // Finish loading check
+        setLoading(false); // Finish loading check
+    };
+
+    restoreSession();
   }, []); // Run only once on mount
 
   // --- Auth Methods ---
@@ -187,27 +211,33 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
    }, [user]);
 
    // --- Gamification Methods (Call Server Actions) ---
-   const addPointsProxy = useCallback(async (userId: string, points: number, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
+   // Renamed internal function to avoid naming conflict in context value
+   const addPointsAndUpdateContext = useCallback(async (userId: string, points: number, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
+       console.log(`Context: Calling addPointsAction for user ${userId}, points: ${points}`);
        try {
          const result = await addPointsAction(userId, points, reason);
+         console.log(`Context: addPointsAction result for ${userId}:`, result);
          if (result.success) {
              if (user && user.id === userId && result.newStats) {
+               console.log(`Context: Updating user state for ${userId} with new stats:`, result.newStats);
                const updatedUser = { ...user, stats: result.newStats };
                setUser(updatedUser);
                sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
+             } else {
+                console.log(`Context: User ${userId} not current user or newStats missing, not updating local state.`);
              }
              return { success: true, newStats: result.newStats };
          } else {
              console.error(`Context: Failed to add points: ${result.message}`);
-             return { success: false };
+             return { success: false, message: result.message, newStats: null };
          }
        } catch (error: any) {
-           console.error(`Context: Failed to add points: ${error.message}`);
-           return { success: false };
+           console.error(`Context: Error calling addPointsAction: ${error.message}`);
+           return { success: false, message: error.message, newStats: null };
        }
-   }, [user]);
+   }, [user]); // Depend on user state
 
-    const awardBadgeProxy = useCallback(async (userId: string, badgeName: string, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
+    const awardBadgeAndUpdateContext = useCallback(async (userId: string, badgeName: string, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
         try {
           const result = await awardBadgeAction(userId, badgeName, reason);
           if (result.success) {
@@ -238,7 +268,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const submitResult = await submitVolunteerApplicationAction(applicationData, user.id, user.displayName || user.email);
       if (submitResult.success) {
-        await addPointsProxy(user.id, 5, `Applied for opportunity: ${applicationData.opportunityTitle}`);
+         // Call the internal context update function for points
+        await addPointsAndUpdateContext(user.id, 5, `Applied for opportunity: ${applicationData.opportunityTitle}`);
         return { success: true, message: submitResult.message };
       } else {
          return { success: false, message: submitResult.message || 'Application submission failed.' };
@@ -249,7 +280,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setLoading(false);
     }
-  }, [user, addPointsProxy]);
+  }, [user, addPointsAndUpdateContext]); // Use the renamed function
 
   const acceptApplication = useCallback(async (applicationId: string, volunteerId: string): Promise<{ success: boolean; message: string; conversationId?: string }> => {
      if (!user || user.role !== 'organization') {
@@ -257,10 +288,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
      }
      setLoading(true);
      try {
+        // acceptVolunteerApplication action now handles points awarding internally
         const result = await acceptVolunteerApplication(applicationId, volunteerId, user.id, user.displayName);
         if (result.success) {
-            // Points awarding is handled within the acceptVolunteerApplication action now
             console.log(`Context: Application ${applicationId} accepted successfully.`);
+            // Optionally trigger a refresh of the volunteer's data if needed, but points are handled server-side
             return { success: true, message: result.message, conversationId: result.conversationId };
         } else {
             console.error("Context: Error accepting application via action:", result.message);
@@ -272,7 +304,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
      } finally {
        setLoading(false);
      }
-   }, [user]); // Removed addPointsProxy dependency
+   }, [user]); // Removed addPointsAndUpdateContext dependency
 
   const rejectApplication = useCallback(async (applicationId: string): Promise<{ success: boolean; message: string }> => {
        if (!user || user.role !== 'organization') {
@@ -347,10 +379,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
 
   // Initial loading state UI
-  if (loading) {
+  if (loading && !user) { // Show skeleton only during initial load if no user is restored yet
     return (
        <div className="flex flex-col min-h-screen">
-         <div className="bg-primary h-14 flex items-center justify-between px-4">
+         <div className="bg-primary h-16 flex items-center justify-between px-4 shadow-md"> {/* Increased height */}
            <Skeleton className="h-7 w-48 bg-primary/50" />
            <Skeleton className="h-9 w-9 rounded-full bg-primary/50" />
          </div>
@@ -375,8 +407,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         rejectApplication, // Add rejectApplication to context value
         getUserConversations,
         startConversation, // Add startConversation to context value
-        addPoints: addPointsProxy,
-        awardBadge: awardBadgeProxy,
+        addPoints: addPointsAndUpdateContext, // Expose the renamed function as 'addPoints'
+        awardBadge: awardBadgeAndUpdateContext, // Expose the renamed function as 'awardBadge'
      }}>
       {children}
     </AuthContext.Provider>
@@ -391,4 +423,3 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
-    
