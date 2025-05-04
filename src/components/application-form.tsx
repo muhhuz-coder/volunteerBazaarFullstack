@@ -58,16 +58,19 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
       applicantName: user?.displayName || '', // Pre-fill if user is logged in
       applicantEmail: user?.email || '', // Pre-fill if user is logged in
       statementOfInterest: '',
-      // attachment: undefined,
+      attachment: undefined, // Default file input value should be undefined
     },
   });
 
  // Effect to update form defaults if user data loads after initial render
  React.useEffect(() => {
     if (user) {
+      // Only reset fields if they haven't been touched by the user yet,
+      // or always reset non-file fields. Be careful not to overwrite user input unintentionally.
+      // For file inputs, we generally don't reset programmatically.
       form.reset({
-        applicantName: user.displayName || '',
-        applicantEmail: user.email || '',
+        applicantName: form.formState.dirtyFields.applicantName ? form.getValues('applicantName') : user.displayName || '',
+        applicantEmail: form.formState.dirtyFields.applicantEmail ? form.getValues('applicantEmail') : user.email || '',
         statementOfInterest: form.getValues('statementOfInterest'), // Keep existing statement
         attachment: form.getValues('attachment'), // Keep existing file selection
       });
@@ -92,6 +95,7 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
     if (values.attachment) {
         // Simulate file upload -> In a real app, upload and get URL
         attachmentUrl = `simulated/path/to/${values.attachment.name}`;
+        console.log('Simulated attachment URL:', attachmentUrl);
     }
 
     // Prepare data for the context function
@@ -100,7 +104,7 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
       opportunityTitle: opportunity.title, // Add opportunity title
       applicantName: values.applicantName,
       applicantEmail: values.applicantEmail,
-      resumeUrl: attachmentUrl,
+      resumeUrl: attachmentUrl, // Use the simulated URL
       coverLetter: values.statementOfInterest || '',
     };
 
@@ -185,18 +189,21 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
               <FormControl>
                  <div className="relative">
                     <Input
-                      {...fieldProps}
+                      {...fieldProps} // Pass rest props like name, onBlur, ref
                       type="file"
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                       onChange={(event) => {
+                         // react-hook-form's onChange expects the value, not the event
                         onChange(event.target.files ? event.target.files[0] : undefined);
                       }}
-                      value={value ? undefined : ''}
+                      // !! REMOVED value prop to fix controlled/uncontrolled warning !!
+                      // File inputs value is read-only and managed by the browser.
                       className="block w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer bg-background"
                        disabled={!isVolunteer}
                     />
-                     {value?.name && <span className="text-sm text-muted-foreground mt-1 block">{value.name}</span>}
-                    <Upload className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    {/* Display selected file name (value is the File object) */}
+                    {value?.name && <span className="text-sm text-muted-foreground mt-1 block">{value.name}</span>}
+                    <Upload className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
                  </div>
               </FormControl>
               <FormDescription>Upload a resume, portfolio, or relevant document (PDF, DOC, DOCX, JPG, PNG, max 5MB).</FormDescription>
