@@ -4,8 +4,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 
 import { Button } from '@/components/ui/button';
@@ -21,7 +19,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { fetchUserRole } = useAuth(); // Use fetchUserRole from context
+  const { signIn } = useAuth(); // Use signIn from the mock context
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -30,33 +28,41 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      // Use the mock signIn function
+      const result = await signIn(email, password);
 
-      // Fetch the user's role after successful login
-      const role = await fetchUserRole(user.uid);
+      if (result.success) {
+        toast({
+          title: 'Login Successful',
+          description: 'Welcome back!',
+        });
 
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back!',
-      });
-
-      // Redirect based on role
-      if (role === 'company') {
-        router.push('/dashboard/company');
-      } else if (role === 'employee') {
-        router.push('/dashboard/employee');
+        // Redirect based on role returned by mock signIn
+        if (result.role === 'company') {
+          router.push('/dashboard/company');
+        } else if (result.role === 'employee') {
+          router.push('/dashboard/employee');
+        } else {
+          // If role is not set or null, redirect to role selection or default dashboard
+          // This might happen if a mock user was created without a role somehow
+          router.push('/select-role'); // Or '/' or a default dashboard
+        }
       } else {
-        // If role is not set or null, redirect to a role selection page or default dashboard
-        router.push('/select-role'); // Or '/' or a default dashboard
+         setError(result.message || 'Login failed.');
+         toast({
+           title: 'Login Failed',
+           description: result.message || 'Please check your email and password.',
+           variant: 'destructive',
+         });
       }
 
     } catch (err: any) {
-      console.error("Login failed:", err);
-      setError(err.message || 'Failed to login. Please check your credentials.');
+      // Catch unexpected errors during the mock process
+      console.error("Login process failed:", err);
+      setError('An unexpected error occurred during login.');
       toast({
-        title: 'Login Failed',
-        description: err.message || 'Please check your email and password.',
+        title: 'Login Error',
+        description: 'An unexpected error occurred. Please try again.',
         variant: 'destructive',
       });
     } finally {

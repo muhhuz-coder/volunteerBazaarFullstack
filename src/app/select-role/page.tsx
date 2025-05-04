@@ -12,20 +12,23 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, UserCheck, Building } from 'lucide-react';
 
 export default function SelectRolePage() {
-  const { user, role: currentRole, setRoleInFirestore, loading: authLoading } = useAuth();
+  // Use 'loading' from useAuth directly for initial auth state check
+  const { user, role: currentRole, setRoleAndUpdateUser, loading: authLoading } = useAuth();
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
-  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false); // Separate loading state for the button action
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    // If auth is not loading and user is not logged in, redirect to login
+    // Redirect immediately if not loading and user is not logged in
     if (!authLoading && !user) {
       router.push('/login');
+      return; // Stop further execution in this effect
     }
-    // If user is logged in and already has a role, redirect to their dashboard
+    // Redirect immediately if not loading and user already has a role
     if (!authLoading && user && currentRole) {
          router.push(currentRole === 'company' ? '/dashboard/company' : '/dashboard/employee');
+         return; // Stop further execution in this effect
     }
      // Pre-fill selection if a role exists but redirection didn't happen (edge case)
      if (currentRole) {
@@ -45,9 +48,10 @@ export default function SelectRolePage() {
       return;
     }
 
-    setLoading(true);
+    setActionLoading(true); // Use separate loading state for the action
     try {
-      await setRoleInFirestore(user.uid, selectedRole);
+      // Use the simplified role setting function from the mock context
+      await setRoleAndUpdateUser(selectedRole);
       toast({
         title: "Role Updated",
         description: `Your role has been set to ${selectedRole}.`,
@@ -57,9 +61,9 @@ export default function SelectRolePage() {
     } catch (error) {
       console.error("Failed to set role:", error);
       toast({ title: "Error", description: "Failed to update role. Please try again.", variant: "destructive" });
-      setLoading(false);
+      setActionLoading(false); // Ensure loading state is turned off on error
     }
-    // No finally block needed for setLoading(false) as redirection happens on success
+    // No finally block needed for setActionLoading(false) as redirection happens on success
   };
 
   // Show loading indicator while checking auth state or if user already has a role
@@ -87,7 +91,7 @@ export default function SelectRolePage() {
           >
             <Label
               htmlFor="role-employee"
-              className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground ${selectedRole === 'employee' ? 'border-primary' : ''}`}
+              className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${selectedRole === 'employee' ? 'border-primary' : ''}`}
             >
               <RadioGroupItem value="employee" id="role-employee" className="sr-only" />
               <UserCheck className="mb-3 h-6 w-6" />
@@ -95,15 +99,15 @@ export default function SelectRolePage() {
             </Label>
             <Label
               htmlFor="role-company"
-              className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground ${selectedRole === 'company' ? 'border-primary' : ''}`}
+              className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${selectedRole === 'company' ? 'border-primary' : ''}`}
             >
               <RadioGroupItem value="company" id="role-company" className="sr-only" />
               <Building className="mb-3 h-6 w-6" />
               Employer (Company)
             </Label>
           </RadioGroup>
-           <Button onClick={handleRoleSelection} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={loading || !selectedRole}>
-             {loading ? (
+           <Button onClick={handleRoleSelection} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={actionLoading || !selectedRole}>
+             {actionLoading ? (
                <>
                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                  Saving...

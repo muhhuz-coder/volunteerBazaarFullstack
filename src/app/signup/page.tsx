@@ -4,8 +4,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { useAuth, UserRole } from '@/context/AuthContext';
 
 import { Button } from '@/components/ui/button';
@@ -20,12 +18,12 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState(''); // Add display name state
+  const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { setRoleInFirestore } = useAuth();
+  const { signUp } = useAuth(); // Use signUp from mock context
   const { toast } = useToast();
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -46,35 +44,45 @@ export default function SignupPage() {
         toast({ title: "Signup Error", description: "Please select a role.", variant: "destructive" });
         return;
     }
+     if (!displayName.trim()) {
+        setError("Please enter your name or company name.");
+        setLoading(false);
+        toast({ title: "Signup Error", description: "Name cannot be empty.", variant: "destructive" });
+        return;
+      }
+
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      // Use the mock signUp function
+      const result = await signUp(email, password, displayName, role);
 
-      // Update user profile with display name
-      await updateProfile(user, { displayName: displayName || email.split('@')[0] }); // Use email prefix if no name
+      if (result.success) {
+        toast({
+          title: 'Signup Successful',
+          description: 'Your account has been created.',
+        });
 
-      // Set the role in Firestore immediately after signup
-      await setRoleInFirestore(user.uid, role);
-
-      toast({
-        title: 'Signup Successful',
-        description: 'Your account has been created.',
-      });
-
-      // Redirect based on role
-      if (role === 'company') {
-        router.push('/dashboard/company');
+        // Redirect based on the selected role
+        if (role === 'company') {
+          router.push('/dashboard/company');
+        } else {
+          router.push('/dashboard/employee');
+        }
       } else {
-        router.push('/dashboard/employee');
+         setError(result.message || 'Signup failed.');
+         toast({
+           title: 'Signup Failed',
+           description: result.message || 'An error occurred during signup.',
+           variant: 'destructive',
+         });
       }
 
     } catch (err: any) {
-      console.error("Signup failed:", err);
-      setError(err.message || 'Failed to sign up. Please try again.');
+      console.error("Signup process failed:", err);
+      setError('An unexpected error occurred during signup.');
       toast({
-        title: 'Signup Failed',
-        description: err.message || 'An error occurred during signup.',
+        title: 'Signup Error',
+        description: 'An unexpected error occurred. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -123,7 +131,7 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={6} // Keep basic validation
                 className="bg-background"
               />
             </div>
@@ -143,7 +151,7 @@ export default function SignupPage() {
                <Select
                  value={role || ''}
                  onValueChange={(value) => setRole(value as UserRole)}
-                 required
+                 required // Keep required validation
                >
                  <SelectTrigger id="role" className="w-full bg-background">
                    <SelectValue placeholder="Select your role" />

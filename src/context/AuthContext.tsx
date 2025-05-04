@@ -1,30 +1,28 @@
 // src/context/AuthContext.tsx
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { onAuthStateChanged, User as FirebaseUser, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton'; // For loading state
-import { setAuthCookie, clearAuthCookie } from '@/utils/setAuthCookie'; // Import cookie functions
 
 export type UserRole = 'employee' | 'company' | null;
 
 interface UserProfile {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
+  id: string; // Simple ID (e.g., email or generated string)
+  email: string;
+  displayName: string;
   role: UserRole;
-  // Add other profile fields as needed, e.g., photoURL
 }
 
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   role: UserRole;
+  signIn: (email: string, pass: string) => Promise<{ success: boolean; message: string; role?: UserRole | null }>;
+  signUp: (email: string, pass: string, name: string, role: UserRole) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
-  setRoleInFirestore: (uid: string, role: UserRole) => Promise<void>;
-  fetchUserRole: (uid: string) => Promise<UserRole>;
+  setRoleAndUpdateUser: (role: UserRole) => Promise<void>; // Simplified role setting
+  // Removed fetchUserRole and setRoleInFirestore
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,103 +31,116 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Mock user database (replace with actual storage if needed beyond session)
+const mockUsers = new Map<string, UserProfile>();
+// Add a default company and employee for testing
+mockUsers.set('company@example.com', { id: 'company@example.com', email: 'company@example.com', displayName: 'Test Company', role: 'company' });
+mockUsers.set('employee@example.com', { id: 'employee@example.com', email: 'employee@example.com', displayName: 'Test Employee', role: 'employee' });
+
+
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<UserRole>(null);
+  const router = useRouter(); // Use router for redirects if needed
 
-  const fetchUserRole = async (uid: string): Promise<UserRole> => {
-    try {
-      const userDocRef = doc(db, 'users', uid);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        return userData?.role || null;
-      }
-       console.warn(`No user document found for UID: ${uid}`);
-      return null;
-    } catch (error) {
-      console.error("Error fetching user role:", error);
-      return null;
-    }
-  };
-
-  const setRoleInFirestore = async (uid: string, roleToSet: UserRole): Promise<void> => {
-     if (!uid || !roleToSet) return;
-     try {
-       const userDocRef = doc(db, 'users', uid);
-       // Ensure email is also stored initially if available, useful for reference
-       const userAuth = auth.currentUser;
-       const dataToSet: { role: UserRole, email?: string | null } = { role: roleToSet };
-       if(userAuth?.email) {
-         dataToSet.email = userAuth.email;
-       }
-       await setDoc(userDocRef, dataToSet, { merge: true });
-       setRole(roleToSet); // Update local role state
-       // Update user profile state locally as well
-       setUser(prevUser => prevUser ? { ...prevUser, role: roleToSet } : null);
-       console.log(`Role set to ${roleToSet} for user ${uid}`);
-     } catch (error) {
-       console.error("Error setting user role in Firestore:", error);
-     }
-   };
-
-
+  // Simulate checking auth state on load (e.g., from localStorage)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      setLoading(true); // Start loading on auth state change
-      if (firebaseUser) {
-        console.log("Auth state changed: User logged in", firebaseUser.uid);
-        const fetchedRole = await fetchUserRole(firebaseUser.uid);
-        console.log("Fetched role:", fetchedRole);
-        const userProfile: UserProfile = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          role: fetchedRole,
-        };
-        setUser(userProfile);
-        setRole(fetchedRole);
-        // Set the cookie for middleware verification
-        await setAuthCookie(firebaseUser);
-      } else {
-        console.log("Auth state changed: User logged out");
-        setUser(null);
-        setRole(null);
-        // Clear the cookie on logout
-        clearAuthCookie();
-      }
-      setLoading(false); // Finish loading after processing auth state
-    });
+     // In a real simple auth, you might check localStorage here
+     // For this example, we start logged out
+    setUser(null);
+    setRole(null);
+    setLoading(false); // No async check needed
+  }, []);
 
-    // Cleanup subscription on unmount
-    return () => {
-      console.log("Unsubscribing from auth state changes.");
-      unsubscribe();
-    }
-  }, []); // Empty dependency array ensures this runs only once on mount
-
-  const signOut = async () => {
+  const signIn = useCallback(async (email: string, pass: string): Promise<{ success: boolean; message: string; role?: UserRole | null }> => {
+    console.log('Attempting mock sign in for:', email);
     setLoading(true);
-    try {
-      await firebaseSignOut(auth);
-      // Auth state change listener will handle setting user/role to null and clearing cookie
-      console.log("Sign out initiated.");
-    } catch (error) {
-      console.error("Error signing out:", error);
-       setLoading(false); // Ensure loading stops on error
+    // Simulate API delay
+    await new Promise(res => setTimeout(res, 500));
+
+    const existingUser = mockUsers.get(email);
+
+    if (existingUser) {
+      // Simulate password check (in reality, NEVER store plain passwords)
+      // For demo, any password works if user exists
+      setUser(existingUser);
+      setRole(existingUser.role);
+      setLoading(false);
+      console.log('Mock sign in successful:', existingUser);
+      return { success: true, message: 'Login successful!', role: existingUser.role };
+    } else {
+      setLoading(false);
+      console.log('Mock sign in failed: User not found');
+      return { success: false, message: 'Invalid email or password.' };
     }
-    // No finally block needed for setLoading(false), handled by listener
-  };
+  }, []);
 
-  // Display a loading skeleton or similar while auth state is being determined initially
-  // We use a separate initialLoading state to prevent brief flashes of the skeleton during sign-out/sign-in
-   const [initialLoading, setInitialLoading] = useState(true);
-   useEffect(() => {
-     if(!loading) setInitialLoading(false);
-   }, [loading]);
+  const signUp = useCallback(async (email: string, pass: string, name: string, roleToSet: UserRole): Promise<{ success: boolean; message: string }> => {
+     console.log('Attempting mock sign up for:', email, 'with role:', roleToSet);
+    if (!roleToSet) {
+        return { success: false, message: 'Role is required for signup.' };
+    }
+    setLoading(true);
+    await new Promise(res => setTimeout(res, 500));
 
-  if (initialLoading) {
+    if (mockUsers.has(email)) {
+      setLoading(false);
+      console.log('Mock sign up failed: Email already exists');
+      return { success: false, message: 'Email already in use.' };
+    }
+
+    const newUser: UserProfile = {
+      id: email, // Use email as ID for simplicity
+      email: email,
+      displayName: name,
+      role: roleToSet,
+    };
+
+    mockUsers.set(email, newUser);
+    setUser(newUser);
+    setRole(newUser.role);
+    setLoading(false);
+    console.log('Mock sign up successful:', newUser);
+    return { success: true, message: 'Signup successful!' };
+  }, []);
+
+  const signOut = useCallback(async () => {
+    console.log('Mock signing out');
+    setLoading(true);
+    await new Promise(res => setTimeout(res, 300)); // Simulate delay
+    setUser(null);
+    setRole(null);
+    // In a real simple auth, you might clear localStorage here
+    setLoading(false);
+     // Redirect to home page after sign out
+     router.push('/');
+     console.log('Mock sign out complete');
+  }, [router]);
+
+  const setRoleAndUpdateUser = useCallback(async (roleToSet: UserRole) => {
+     if (!user) {
+       console.error("Cannot set role: No user logged in.");
+       return;
+     }
+      if (!roleToSet) {
+         console.error("Cannot set role: Role is null or undefined.");
+         return;
+      }
+     setLoading(true);
+     await new Promise(res => setTimeout(res, 300)); // Simulate delay
+
+     const updatedUser: UserProfile = { ...user, role: roleToSet };
+     mockUsers.set(user.email, updatedUser); // Update mock DB
+     setUser(updatedUser);
+     setRole(roleToSet);
+     setLoading(false);
+     console.log(`Mock role updated to ${roleToSet} for user ${user.email}`);
+   }, [user]);
+
+
+  // Display a loading skeleton or similar only during explicit loading phases
+  if (loading && !user) { // Show skeleton only on initial load or during sign-in/sign-up transitions when user isn't set yet
     return (
        <div className="flex flex-col min-h-screen">
          {/* Simulate Header structure */}
@@ -152,10 +163,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     );
   }
 
-
   return (
-    <AuthContext.Provider value={{ user, loading, role, signOut, setRoleInFirestore, fetchUserRole }}>
-      {!loading ? children : null /* Render children only when not actively processing auth changes */}
+    <AuthContext.Provider value={{ user, loading, role, signIn, signUp, signOut, setRoleAndUpdateUser }}>
+      {children}
     </AuthContext.Provider>
   );
 };

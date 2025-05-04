@@ -1,8 +1,9 @@
+// src/components/layout/header.tsx
 'use client';
 
 import Link from 'next/link';
-import { Briefcase, LogOut, User, Building, LayoutDashboard } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { Briefcase, LogOut, LayoutDashboard } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext'; // Using mock context
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -12,20 +13,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // Removed AvatarImage
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function Header() {
-  const { user, loading, signOut, role } = useAuth();
+  const { user, loading, signOut, role } = useAuth(); // Using mock context values
 
   const getInitials = (name?: string | null) => {
     if (!name) return 'U';
     const names = name.split(' ');
-    if (names.length === 1) return names[0][0].toUpperCase();
-    return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
+    if (names.length === 1) return name[0].toUpperCase();
+    return names[0][0].toUpperCase() + (names.length > 1 ? names[names.length - 1][0].toUpperCase() : '');
   };
 
-  const dashboardPath = role === 'company' ? '/dashboard/company' : '/dashboard/employee';
+  // Determine dashboard path, default to home if role not set yet
+  const dashboardPath = role === 'company' ? '/dashboard/company'
+                      : role === 'employee' ? '/dashboard/employee'
+                      : '/select-role'; // Or '/' if prefer home
 
   return (
     <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-40">
@@ -36,16 +40,17 @@ export function Header() {
         </Link>
 
         <div className="flex items-center gap-3">
+          {/* Show skeleton only during explicit loading state (like sign in/out) */}
           {loading ? (
-             <Skeleton className="h-9 w-20 rounded-md" />
+             <Skeleton className="h-9 w-9 rounded-full" />
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    {/* Add user.photoURL if available */}
-                    {/* <AvatarImage src={user.photoURL} alt={user.displayName || 'User'} /> */}
+                    {/* No AvatarImage needed for mock user */}
                     <AvatarFallback className="bg-primary-foreground text-primary font-semibold">
+                      {/* Use displayName or derive from email */}
                       {getInitials(user.displayName || user.email)}
                     </AvatarFallback>
                   </Avatar>
@@ -55,6 +60,7 @@ export function Header() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
+                      {/* Use displayName or email */}
                       {user.displayName || user.email}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground">
@@ -66,12 +72,21 @@ export function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                   <Link href={dashboardPath}>
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    <span>Dashboard</span>
-                   </Link>
-                </DropdownMenuItem>
+                 {role ? ( // Only show dashboard link if role is set
+                    <DropdownMenuItem asChild>
+                       <Link href={dashboardPath}>
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        <span>Dashboard</span>
+                       </Link>
+                    </DropdownMenuItem>
+                 ) : (
+                     <DropdownMenuItem asChild>
+                        <Link href="/select-role">
+                         <LayoutDashboard className="mr-2 h-4 w-4" />
+                         <span>Select Role</span>
+                        </Link>
+                     </DropdownMenuItem>
+                 )}
                 {/* Add other items like Profile, Settings later */}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="cursor-pointer">

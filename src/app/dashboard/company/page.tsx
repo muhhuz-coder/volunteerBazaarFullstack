@@ -3,7 +3,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext'; // Using mock context
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,14 +11,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, AlertCircle } from 'lucide-react';
 
 export default function CompanyDashboard() {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading } = useAuth(); // Using mock context values
   const router = useRouter();
 
   useEffect(() => {
     // If not loading and user is not logged in OR role is not company, redirect
     if (!loading && (!user || role !== 'company')) {
+      console.log('Redirecting from company dashboard: Not logged in or incorrect role.');
       router.push('/login'); // Redirect to login if not an authenticated company user
     }
+     console.log('Company dashboard effect:', { loading, user, role });
   }, [user, role, loading, router]);
 
   // Show loading state while checking auth/role
@@ -42,20 +44,23 @@ export default function CompanyDashboard() {
   }
 
    // If user is logged in but not a company, show verifying/error or redirect might have already happened
+   // This condition might be briefly hit if redirection is slightly delayed
    if (!user || role !== 'company') {
+     console.log('Rendering Access Denied on company dashboard (should be redirecting soon)');
      return (
        <div className="flex flex-col min-h-screen bg-secondary">
          <Header />
          <div className="flex-grow flex flex-col justify-center items-center text-center px-4">
            <AlertCircle className="h-12 w-12 text-destructive mb-4" />
            <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
-           <p className="text-muted-foreground">You do not have permission to view this page.</p>
+           <p className="text-muted-foreground">Redirecting to login...</p>
          </div>
        </div>
      );
    }
 
   // Render the dashboard content if user is an authenticated company user
+  console.log('Rendering company dashboard for user:', user?.email);
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
       <Header />
