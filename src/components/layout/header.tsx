@@ -2,8 +2,8 @@
 'use client';
 
 import Link from 'next/link';
-// Updated icon and added MessageSquare, Star
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star } from 'lucide-react';
+// Updated icon and added MessageSquare, Star, BarChart3 for Analytics
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,16 +45,21 @@ export function Header() {
                       : role === 'volunteer' ? '/dashboard/volunteer'
                       : '/select-role'; // Or '/' if prefer home
 
-   // Define nav links - conditionally add Messages link
+   // Define nav links - conditionally add Messages link and Analytics
    const baseNavLinks = [
      { href: "/", label: "Opportunities" },
      { href: "/about", label: "About Us" },
      { href: "/how-it-works", label: "How It Works" },
      { href: "/contact", label: "Contact" },
+     { href: "/analytics", label: "Analytics", icon: BarChart3 }, // Added Analytics link
    ];
 
    const navLinks = user
-     ? [...baseNavLinks, { href: "/dashboard/messages", label: "Messages" }]
+     ? [
+         ...baseNavLinks.filter(link => link.href !== '/analytics'), // Remove analytics from base if user logged in to reorder
+         { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
+         { href: "/analytics", label: "Analytics", icon: BarChart3 }, // Add Analytics back after Messages
+       ]
      : baseNavLinks;
 
 
@@ -73,7 +78,8 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-4">
            {navLinks.map(link => (
               <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10 relative">
-                <Link href={link.href}>
+                <Link href={link.href} className="flex items-center gap-1.5">
+                   {link.icon && <link.icon className="h-4 w-4" />}
                    {link.label}
                    {/* Add unread indicator if needed - requires fetching unread count */}
                    {/* {link.label === "Messages" && unreadCount > 0 && (
@@ -178,7 +184,10 @@ export function Header() {
                  <nav className="flex flex-col gap-2 mb-6">
                     {navLinks.map(link => (
                        <Button key={link.href} variant="ghost" asChild className="justify-start text-base" onClick={closeMobileMenu}>
-                         <Link href={link.href}>{link.label}</Link>
+                         <Link href={link.href} className="flex items-center gap-2">
+                           {link.icon && <link.icon className="h-5 w-5" />}
+                           {link.label}
+                         </Link>
                        </Button>
                     ))}
                  </nav>
