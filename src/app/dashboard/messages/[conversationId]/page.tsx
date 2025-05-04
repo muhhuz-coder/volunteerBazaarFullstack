@@ -33,22 +33,24 @@ export default function ConversationPage() {
     const getInitials = (name?: string | null): string => {
        if (!name) return 'U';
        const names = name.split(' ');
-       if (names.length === 1) return name[0].toUpperCase();
-       return names[0][0].toUpperCase() + (names.length > 1 ? names[names.length - 1][0].toUpperCase() : '');
+       if (names.length === 1 && name.length > 0) return name[0].toUpperCase();
+       if (names.length > 1 && names[0].length > 0 && names[names.length - 1].length > 0) {
+           return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
+       }
+       return name.length > 0 ? name[0].toUpperCase() : 'U'; // Fallback for single long name or empty strings
     };
 
-     // Function to get display name based on sender ID
+     // Function to get display name based on sender ID using conversation details
      const getSenderName = (senderId: string): string => {
         if (!conversation || !user) return "Unknown";
         if (senderId === user.id) return "You";
-        // Look up the other party's name
-         if (user.role === 'organization') {
-             // Assuming volunteer details might be stored or fetched
-             return conversation.volunteerName || `Volunteer (${senderId.substring(0, 4)})`;
-         } else { // user is volunteer
-             // Assuming org details might be stored or fetched
-             return conversation.organizationName || `Organization (${senderId.substring(0, 4)})`;
-         }
+
+        if (senderId === conversation.organizationId) {
+            return conversation.organizationName || `Organization (${senderId.substring(0, 4)})`;
+        } else if (senderId === conversation.volunteerId) {
+            return conversation.volunteerName || `Volunteer (${senderId.substring(0, 4)})`;
+        }
+        return "Unknown"; // Fallback
     };
 
 
@@ -59,17 +61,16 @@ export default function ConversationPage() {
                 const { conversation: convoDetails, messages: convoMessages } = await getConversationDetails(conversationId, user.id, user.role as 'organization' | 'volunteer');
                 setConversation(convoDetails);
                 setMessages(convoMessages);
-                 // TODO: Mark messages as read here or in the service
+                 // Service function now handles marking as read
             } catch (error) {
                 console.error("Failed to fetch conversation details:", error);
                 toast({ title: 'Error', description: 'Could not load conversation.', variant: 'destructive' });
-                // Optionally redirect back if conversation doesn't exist or access denied
-                // router.push('/dashboard/messages');
+                 setConversation(null); // Ensure conversation is null on error
             } finally {
                 setLoadingConversation(false);
             }
         }
-    }, [user, conversationId, toast, router]); // Added router to dependencies
+    }, [user, conversationId, toast]); // Removed router dependency as it's not used in fetch logic
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -77,7 +78,7 @@ export default function ConversationPage() {
         } else if (user) {
             fetchConversationData();
         }
-    }, [user, authLoading, router, fetchConversationData]); // Added fetchConversationData
+    }, [user, authLoading, router, fetchConversationData]);
 
 
      // Scroll to bottom when messages change
@@ -94,8 +95,10 @@ export default function ConversationPage() {
 
         setIsSending(true);
         try {
+             // Service function now handles persistence
             const sentMessage = await sendMessage(conversationId, user.id, newMessage.trim());
-            setMessages(prev => [...prev, sentMessage]); // Add new message optimistically
+             // The service returns the message with a Date object
+            setMessages(prev => [...prev, sentMessage]); // Add new message
             setNewMessage(''); // Clear input
         } catch (error) {
             console.error("Failed to send message:", error);
@@ -154,7 +157,7 @@ export default function ConversationPage() {
      }
 
     if (!conversation) {
-         // Handle case where conversation couldn't be loaded (e.g., not found, access denied)
+         // Handle case where conversation couldn't be loaded
          return (
               <div className="flex flex-col min-h-screen bg-secondary">
                 <Header />
@@ -188,6 +191,7 @@ export default function ConversationPage() {
 
                 <Card className="shadow-lg border w-full max-w-2xl mx-auto flex-grow flex flex-col">
                     <CardHeader className="border-b">
+                        {/* Use conversation details for the title */}
                         <CardTitle>Conversation with {getSenderName(user.role === 'organization' ? conversation.volunteerId : conversation.organizationId)}</CardTitle>
                         <CardDescription>Regarding: {conversation.opportunityTitle || 'General Inquiry'}</CardDescription>
                     </CardHeader>
@@ -203,6 +207,7 @@ export default function ConversationPage() {
                                 {msg.senderId !== user.id && (
                                     <Avatar className="h-8 w-8">
                                         <AvatarFallback className="text-xs">
+                                             {/* Use getSenderName and getInitials */}
                                             {getInitials(getSenderName(msg.senderId))}
                                         </AvatarFallback>
                                     </Avatar>
@@ -220,12 +225,17 @@ export default function ConversationPage() {
                                           "text-xs mt-1",
                                           msg.senderId === user.id ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-left"
                                       )}>
-                                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                          {/* Ensure timestamp is a Date object */}
+                                         {msg.timestamp instanceof Date
+                                             ? msg.timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                                             : new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) // Fallback parsing
+                                         }
                                      </p>
                                 </div>
                                  {msg.senderId === user.id && (
                                      <Avatar className="h-8 w-8">
                                          <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                                             {/* Use getSenderName and getInitials */}
                                              {getInitials(getSenderName(msg.senderId))}
                                          </AvatarFallback>
                                      </Avatar>

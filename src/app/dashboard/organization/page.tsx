@@ -27,6 +27,7 @@ export default function OrganizationDashboard() {
     if (user && role === 'organization') {
       setLoadingApps(true);
       try {
+        // Service function now reads persisted data
         const fetchedApps = await getApplicationsForOrganization(user.id);
         setApplications(fetchedApps);
       } catch (error) {
@@ -39,31 +40,28 @@ export default function OrganizationDashboard() {
   }, [user, role, toast]); // Dependencies for useCallback
 
   useEffect(() => {
-    // Redirect if auth state is determined and user is not correct
     if (!authLoading && (!user || role !== 'organization')) {
       console.log('Redirecting from organization dashboard: Not logged in or incorrect role.');
       router.push('/login');
     } else if (user && role === 'organization') {
-        // Fetch applications if user is correctly identified
         fetchApps();
     }
      console.log('Organization dashboard effect:', { authLoading, user, role });
-  }, [user, role, authLoading, router, fetchApps]); // Add fetchApps to dependency array
+  }, [user, role, authLoading, router, fetchApps]);
 
   const handleAccept = async (app: VolunteerApplication) => {
      setProcessingAppId(app.id);
      try {
-        const result = await acceptApplication(app.id, app.volunteerId); // Use context function
+        // Use context function (which calls services that handle persistence)
+        const result = await acceptApplication(app.id, app.volunteerId);
         if (result.success) {
            toast({ title: 'Success', description: `Application accepted. Conversation started.` });
            // Update UI: Change status locally or re-fetch
            setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'accepted' } : a));
-            // Optionally redirect to the new conversation
-            if (result.conversationId) {
-               // Assuming a route like /dashboard/messages/[conversationId]
-               // router.push(`/dashboard/messages/${result.conversationId}`);
-               console.log("Navigate to conversation:", result.conversationId); // Placeholder
-            }
+            // Optional redirect handled in context or here if needed
+            // if (result.conversationId) {
+            //    router.push(`/dashboard/messages/${result.conversationId}`);
+            // }
         } else {
            toast({ title: 'Error', description: result.message, variant: 'destructive' });
         }
@@ -78,7 +76,7 @@ export default function OrganizationDashboard() {
   const handleReject = async (app: VolunteerApplication) => {
       setProcessingAppId(app.id);
       try {
-          // Use the direct service call for rejection (or add to context if preferred)
+          // Use the direct service call for rejection (service handles persistence)
           await updateApplicationStatus(app.id, 'rejected');
           toast({ title: 'Success', description: `Application rejected.` });
           // Update UI
@@ -105,7 +103,6 @@ export default function OrganizationDashboard() {
            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
            </div>
-            {/* Skeleton for Applications Card */}
            <Skeleton className="h-64 w-full mt-6" />
          </div>
          <footer className="bg-primary p-4 mt-auto">
@@ -116,7 +113,6 @@ export default function OrganizationDashboard() {
   }
 
    if (!user || role !== 'organization') {
-     // User is not logged in or not an organization, show access denied or redirect (handled by useEffect)
      return (
        <div className="flex flex-col min-h-screen bg-secondary">
          <Header />
@@ -132,7 +128,6 @@ export default function OrganizationDashboard() {
      );
    }
 
-  // Render the dashboard content
   console.log('Rendering organization dashboard for user:', user?.email);
   const submittedApplications = applications.filter(app => app.status === 'submitted');
 
@@ -147,15 +142,14 @@ export default function OrganizationDashboard() {
           </Button>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-          {/* Existing summary cards can go here */}
            <Card className="shadow-md border">
              <CardHeader>
                <CardTitle>Active Opportunities</CardTitle>
                <CardDescription>Manage your current volunteer postings.</CardDescription>
              </CardHeader>
              <CardContent>
-               <p>You have 3 active volunteer opportunities.</p>
-                {/* TODO: Link to opportunity management page */}
+                {/* TODO: Fetch and display actual count */}
+               <p>You have active volunteer opportunities.</p>
              </CardContent>
            </Card>
            <Card className="shadow-md border">
@@ -165,7 +159,6 @@ export default function OrganizationDashboard() {
              </CardHeader>
              <CardContent>
                 <p>{applications.length} total applications received.</p>
-                 {/* TODO: Link to view all applications */}
              </CardContent>
            </Card>
             <Card className="shadow-md border">
@@ -175,12 +168,10 @@ export default function OrganizationDashboard() {
               </CardHeader>
               <CardContent>
                 <p>Keep your organization details current.</p>
-                 {/* TODO: Link to profile settings */}
               </CardContent>
             </Card>
         </div>
 
-        {/* New Applications Section */}
         <Card className="shadow-lg border">
           <CardHeader>
             <CardTitle>New Volunteer Applications ({submittedApplications.length})</CardTitle>
@@ -196,7 +187,8 @@ export default function OrganizationDashboard() {
                          <div>
                             <CardTitle className="text-lg">{app.applicantName}</CardTitle>
                             <CardDescription>Interested in: {app.opportunityTitle}</CardDescription>
-                            <CardDescription>Submitted: {new Date(app.submittedAt).toLocaleDateString()}</CardDescription>
+                            {/* Ensure submittedAt is a Date object before formatting */}
+                            <CardDescription>Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : new Date(app.submittedAt).toLocaleDateString()}</CardDescription>
                          </div>
                           <Badge variant="secondary">{app.status}</Badge>
                       </div>
@@ -236,7 +228,6 @@ export default function OrganizationDashboard() {
           </CardContent>
         </Card>
 
-        {/* Link to Messaging Hub */}
          <div className="mt-6 text-center">
             <Button asChild variant="outline">
                <Link href="/dashboard/messages">

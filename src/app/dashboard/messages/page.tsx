@@ -79,26 +79,15 @@ export default function MessagesPage() {
         );
     }
 
-    // Determine the other party's role for display
+    // Determine the other party's name based on conversation details
     const getOtherPartyName = (convo: Conversation): string => {
        if (!user) return "Unknown";
        if (user.role === 'organization') {
-            // Find volunteer name (assuming volunteer details are included or fetched separately)
-            // For mock, we might need to look up the volunteer in mockUsers
-            const volunteer = Array.from(mockUsers.values()).find(u => u.id === convo.volunteerId);
-            return volunteer?.displayName ?? `Volunteer ID: ${convo.volunteerId}`;
+           return convo.volunteerName || `Volunteer (ID: ${convo.volunteerId.substring(0,4)})`; // Use name from convo if available
        } else { // User is volunteer
-            // Find organization name (assuming org details are included or fetched separately)
-             const organization = Array.from(mockUsers.values()).find(u => u.id === convo.organizationId);
-             return organization?.displayName ?? `Org ID: ${convo.organizationId}`;
+           return convo.organizationName || `Organization (ID: ${convo.organizationId.substring(0,4)})`; // Use name from convo if available
        }
     };
-
-    // (Helper function defined outside component or imported if needed elsewhere)
-     const mockUsers = new Map<string, { id: string; email: string; displayName: string; role: 'volunteer' | 'organization' | null }>();
-     mockUsers.set('organization@example.com', { id: 'org1', email: 'organization@example.com', displayName: 'Helping Hands Org', role: 'organization' });
-     mockUsers.set('volunteer@example.com', { id: 'vol1', email: 'volunteer@example.com', displayName: 'Jane Doe Volunteer', role: 'volunteer' });
-
 
     return (
         <div className="flex flex-col min-h-screen bg-secondary">
@@ -134,7 +123,8 @@ export default function MessagesPage() {
                                                  <span className="font-medium">{convo.lastMessage?.senderId === user.id ? 'You:' : ''}</span> {convo.lastMessage?.text ?? 'No messages yet.'}
                                              </p>
                                              <p className="text-xs text-muted-foreground text-right mt-1">
-                                                 {convo.lastMessage ? new Date(convo.lastMessage.timestamp).toLocaleString() : ''}
+                                                 {/* Ensure timestamp is handled correctly */}
+                                                 {convo.lastMessage?.timestamp ? new Date(convo.lastMessage.timestamp).toLocaleString() : ''}
                                              </p>
                                         </div>
                                     </Link>

@@ -10,14 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, FileCheck, Heart, UserCog, MessageSquare, Star, Medal, Trophy } from 'lucide-react';
 import { getApplicationsForVolunteer, type VolunteerApplication } from '@/services/job-board';
-import { getLeaderboard, type LeaderboardEntry } from '@/services/gamification'; // Import gamification service
+import { getLeaderboard, type LeaderboardEntry } from '@/services/gamification'; // Service now reads persisted data
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress'; // For potential progress bars
+import { Progress } from '@/components/ui/progress';
 
 
 export default function VolunteerDashboard() {
-  const { user, role, loading: authLoading, stats: userStats } = useAuth(); // Get user stats from context
+  const { user, role, loading: authLoading } = useAuth(); // User from context includes stats
   const router = useRouter();
   const { toast } = useToast();
 
@@ -27,11 +27,12 @@ export default function VolunteerDashboard() {
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
 
 
-  // Fetch applications for the volunteer
+  // Fetch applications for the volunteer using the service
   const fetchApps = useCallback(async () => {
     if (user && role === 'volunteer') {
       setLoadingApps(true);
       try {
+        // Service function now reads persisted data
         const fetchedApps = await getApplicationsForVolunteer(user.id);
         setApplications(fetchedApps);
       } catch (error) {
@@ -43,10 +44,11 @@ export default function VolunteerDashboard() {
     }
   }, [user, role, toast]);
 
-  // Fetch leaderboard data
+  // Fetch leaderboard data using the service
    const fetchLeaderboardData = useCallback(async () => {
      setLoadingLeaderboard(true);
      try {
+        // Service function now reads persisted data
        const data = await getLeaderboard();
        setLeaderboard(data);
      } catch (error) {
@@ -64,7 +66,7 @@ export default function VolunteerDashboard() {
       router.push('/login');
     } else if (user && role === 'volunteer') {
       fetchApps();
-      fetchLeaderboardData(); // Fetch leaderboard when volunteer logs in
+      fetchLeaderboardData();
     }
      console.log('Volunteer dashboard effect:', { authLoading, user, role });
   }, [user, role, authLoading, router, fetchApps, fetchLeaderboardData]);
@@ -80,7 +82,6 @@ export default function VolunteerDashboard() {
            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
              {[...Array(3)].map((_, i) => <Skeleton key={`summary-${i}`} className="h-32 w-full" />)}
            </div>
-           {/* Skeleton for Applications & Leaderboard Cards */}
             <div className="grid gap-6 md:grid-cols-2 mt-6">
              <Skeleton className="h-64 w-full" />
              <Skeleton className="h-64 w-full" />
@@ -110,11 +111,12 @@ export default function VolunteerDashboard() {
    }
 
 
-  // Render the dashboard content
-   console.log('Rendering volunteer dashboard for user:', user?.email, 'Stats:', user.stats);
+   // Get stats directly from the user object in AuthContext
    const points = user.stats?.points ?? 0;
    const badges = user.stats?.badges ?? [];
-   const nextLevelPoints = 100; // Example: Points needed for next level/badge
+   const nextLevelPoints = 100; // Example
+
+   console.log('Rendering volunteer dashboard for user:', user?.email, 'Stats:', user.stats);
 
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
@@ -156,7 +158,7 @@ export default function VolunteerDashboard() {
               </CardContent>
            </Card>
 
-           {/* Profile Settings (Existing) */}
+           {/* Profile Settings */}
            <Card className="shadow-md border">
              <CardHeader>
                <CardTitle className="flex items-center gap-2"><UserCog className="h-5 w-5" />Profile Settings</CardTitle>
@@ -164,7 +166,7 @@ export default function VolunteerDashboard() {
              </CardHeader>
              <CardContent>
                <p>Keep your information up-to-date.</p>
-               {/* TODO: Add link or button to profile page */}
+               {/* TODO: Link to profile page */}
              </CardContent>
            </Card>
          </div>
@@ -179,12 +181,13 @@ export default function VolunteerDashboard() {
             </CardHeader>
             <CardContent>
               {applications.length > 0 ? (
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-2"> {/* Added scroll */}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                   {applications.map(app => (
                     <div key={app.id} className="flex justify-between items-center p-3 bg-card/80 rounded-md border">
                       <div>
                         <p className="font-medium">{app.opportunityTitle}</p>
-                        <p className="text-sm text-muted-foreground">Submitted: {new Date(app.submittedAt).toLocaleDateString()}</p>
+                        {/* Ensure submittedAt is a Date object before formatting */}
+                        <p className="text-sm text-muted-foreground">Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : new Date(app.submittedAt).toLocaleDateString()}</p>
                       </div>
                       <Badge variant={
                          app.status === 'accepted' ? 'default' : app.status === 'rejected' ? 'destructive' : 'secondary'
@@ -212,7 +215,9 @@ export default function VolunteerDashboard() {
                  <CardDescription>See top contributing volunteers.</CardDescription>
               </CardHeader>
               <CardContent>
-                 {leaderboard.length > 0 ? (
+                 {loadingLeaderboard ? (
+                     <Skeleton className="h-40 w-full" /> // Skeleton for leaderboard loading
+                 ) : leaderboard.length > 0 ? (
                    <ol className="space-y-3">
                      {leaderboard.slice(0, 5).map((entry, index) => ( // Show top 5
                        <li key={entry.userId} className="flex justify-between items-center p-2 bg-card/80 rounded-md border text-sm">
@@ -227,7 +232,6 @@ export default function VolunteerDashboard() {
                  ) : (
                    <p className="text-muted-foreground text-center py-4">Leaderboard data is currently unavailable.</p>
                  )}
-                 {/* TODO: Add link to full leaderboard page */}
               </CardContent>
            </Card>
         </div>
