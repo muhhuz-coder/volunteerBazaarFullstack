@@ -18,6 +18,7 @@ import type { LeaderboardEntry } from '@/services/gamification'; // Keep type
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button'; // Import Button
 // Import server actions
 import { getApplicationsForVolunteerAction } from '@/actions/job-board-actions';
 import { getLeaderboardAction } from '@/actions/gamification-actions'; // Assuming this action exists
@@ -264,3 +265,4 @@ export default function VolunteerDashboard() {
     </div>
   );
 }
+
