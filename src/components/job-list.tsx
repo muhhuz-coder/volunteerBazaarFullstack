@@ -32,30 +32,32 @@ export function OpportunityList({ initialOpportunities, keywords = '', category 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
       {opportunities.map((opportunity) => (
-        <Card key={opportunity.id} className="flex flex-col justify-between shadow-md hover:shadow-lg transition-shadow duration-200 border">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-primary">{opportunity.title}</CardTitle>
-            <CardDescription className="text-muted-foreground">{opportunity.organization}</CardDescription>
+        // Added group class, increased hover shadow, added scale transform
+        <Card key={opportunity.id} className="flex flex-col justify-between shadow-md hover:shadow-xl border group transform transition duration-300 ease-in-out hover:scale-[1.02]">
+          <CardHeader className="pb-3"> {/* Reduced bottom padding */}
+            <CardTitle className="text-xl font-semibold text-primary group-hover:text-accent transition-colors duration-200">{opportunity.title}</CardTitle> {/* Added group-hover effect */}
+            <CardDescription className="text-muted-foreground pt-1">{opportunity.organization}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+          <CardContent className="space-y-3 text-sm flex-grow"> {/* Added flex-grow */}
             <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
+              <MapPin className="h-4 w-4 flex-shrink-0" />
               <span>{opportunity.location}</span>
             </div>
              <div className="flex items-center gap-2 text-muted-foreground">
-              <Activity className="h-4 w-4" />
+              <Activity className="h-4 w-4 flex-shrink-0" />
               <span>{opportunity.category}</span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4 flex-shrink-0" />
               <span>{opportunity.commitment}</span>
             </div>
-            <p className="text-foreground line-clamp-3 pt-2">{opportunity.description}</p>
+            <p className="text-foreground line-clamp-3 pt-3 leading-relaxed">{opportunity.description}</p> {/* Increased top padding, added leading */}
           </CardContent>
-          <CardFooter>
-            <Button asChild variant="link" className="text-accent p-0 h-auto">
+          <CardFooter className="pt-4"> {/* Added top padding */}
+            {/* Added group-hover effect to arrow */}
+            <Button asChild variant="link" className="text-accent p-0 h-auto font-medium group-hover:underline">
               <Link href={`/apply/${opportunity.id}`} className="flex items-center gap-1">
-                Learn More & Apply <ArrowRight className="h-4 w-4" />
+                Learn More & Apply <ArrowRight className="h-4 w-4 transform transition-transform duration-300 group-hover:translate-x-1" />
               </Link>
             </Button>
           </CardFooter>

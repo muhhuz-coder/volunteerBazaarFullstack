@@ -32,9 +32,13 @@ export function Header() {
   const getInitials = (name?: string | null) => {
     if (!name) return 'U';
     const names = name.split(' ');
-    if (names.length === 1) return name[0].toUpperCase();
-    return names[0][0].toUpperCase() + (names.length > 1 ? names[names.length - 1][0].toUpperCase() : '');
+    if (names.length === 1 && name.length > 0) return name[0].toUpperCase();
+    if (names.length > 1 && names[0].length > 0 && names[names.length - 1].length > 0) {
+      return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
+    }
+    return name.length > 0 ? name[0].toUpperCase() : 'U'; // Fallback for single long name or empty strings
   };
+
 
   // Determine dashboard path based on updated roles
   const dashboardPath = role === 'organization' ? '/dashboard/organization'
@@ -57,7 +61,8 @@ export function Header() {
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
-    <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-40">
+    // Added backdrop-blur-sm and bg-primary/95 for subtle transparency and blur
+    <header className="bg-primary/95 text-primary-foreground shadow-md sticky top-0 z-40 backdrop-blur-sm">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2 text-xl md:text-2xl font-bold">
           <AppIcon className="h-6 w-6 md:h-7 md:w-7" />

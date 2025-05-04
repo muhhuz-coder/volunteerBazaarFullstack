@@ -46,12 +46,13 @@ export function OpportunitySearch({ initialKeywords = '', initialCategory = 'All
   };
 
   return (
-    // Updated heading comment
-    <form onSubmit={handleSearch} className="bg-card p-6 rounded-lg shadow-md border mb-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+    // Updated heading comment, added shadow-lg, adjusted mb-10
+    <form onSubmit={handleSearch} className="bg-card p-6 rounded-lg shadow-lg border mb-10">
+      {/* Adjusted gap */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
         {/* Keyword Search */}
         <div className="space-y-2">
-          <label htmlFor="keywords" className="text-sm font-medium text-foreground flex items-center gap-1">
+          <label htmlFor="keywords" className="text-sm font-medium text-foreground flex items-center gap-1.5"> {/* Increased gap */}
             <Search className="h-4 w-4" />
             Keywords
           </label>
@@ -62,19 +63,19 @@ export function OpportunitySearch({ initialKeywords = '', initialCategory = 'All
             placeholder="Opportunity title, organization, or skill"
             value={keywords}
             onChange={(e) => setKeywords(e.target.value)}
-            className="bg-background"
+            className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
           />
         </div>
 
         {/* Category Select */}
         <div className="space-y-2">
-          <label htmlFor="category" className="text-sm font-medium text-foreground flex items-center gap-1">
+          <label htmlFor="category" className="text-sm font-medium text-foreground flex items-center gap-1.5"> {/* Increased gap */}
              {/* Updated icon and label */}
             <Activity className="h-4 w-4" />
              Area of Interest
           </label>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger id="category" className="w-full bg-background">
+            <SelectTrigger id="category" className="w-full bg-background border-border focus:border-primary focus:ring-primary/50"> {/* Added focus styles */}
               {/* Updated placeholder */}
               <SelectValue placeholder="Select area of interest" />
             </SelectTrigger>
@@ -91,7 +92,7 @@ export function OpportunitySearch({ initialKeywords = '', initialCategory = 'All
 
         {/* Search Button */}
         {/* Updated button text */}
-        <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+        <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground h-10"> {/* Ensured consistent height */}
           <Search className="mr-2 h-4 w-4" /> Search Opportunities
         </Button>
       </div>

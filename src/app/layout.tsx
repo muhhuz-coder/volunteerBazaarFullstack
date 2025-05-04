@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google'; // Switched to Inter for a cleaner sans-serif look
+import { GeistSans } from 'geist/font/sans'; // Import Geist Sans
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster'; // Import Toaster
 import { AuthProvider } from '@/context/AuthContext'; // Import AuthProvider
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-geist-sans', // Keep variable name for compatibility if needed elsewhere
-});
+// No need for Inter anymore if GeistSans is primary
+// const inter = Inter({
+//   subsets: ['latin'],
+//   variable: '--font-inter', // Changed variable name
+// });
 
 export const metadata: Metadata = {
   // Updated title and description
@@ -21,8 +22,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} antialiased`}>
+    // Apply GeistSans variable to the html tag
+    <html lang="en" className={`${GeistSans.variable}`}>
+      {/* Body will inherit the font family from globals.css */}
+      <body className={`antialiased`}>
         <AuthProvider> {/* Wrap children with AuthProvider */}
           <main className="min-h-screen flex flex-col">
             {children}

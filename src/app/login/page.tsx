@@ -70,15 +70,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-secondary p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold text-primary">Login</CardTitle>
-          <CardDescription>Enter your email and password to access your account</CardDescription>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary via-background to-secondary p-4"> {/* Added gradient background */}
+      <Card className="w-full max-w-md shadow-xl border"> {/* Increased shadow */}
+        <CardHeader className="space-y-2 text-center pt-8 pb-4"> {/* Adjusted padding */}
+          <LogIn className="mx-auto h-10 w-10 text-primary mb-2" /> {/* Added icon */}
+          <CardTitle className="text-2xl font-bold text-primary">Welcome Back</CardTitle>
+          <CardDescription>Login to manage your volunteer activities.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4">
-          <form onSubmit={handleLogin} className="grid gap-4">
-            <div className="grid gap-2">
+        <CardContent className="px-6 pb-6"> {/* Adjusted padding */}
+          <form onSubmit={handleLogin} className="space-y-5"> {/* Increased spacing */}
+            <div className="grid gap-1.5"> {/* Adjusted gap */}
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -87,10 +88,10 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-background"
+                className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
               />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-1.5"> {/* Adjusted gap */}
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -98,13 +99,13 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="bg-background"
+                className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
               />
             </div>
              {error && (
-               <p className="text-sm text-destructive text-center">{error}</p>
+               <p className="text-sm text-destructive text-center pt-1">{error}</p> // Added top padding
              )}
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={loading}>
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 text-base font-semibold" disabled={loading}> {/* Increased padding/font size */}
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -118,10 +119,10 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col gap-2 text-center text-sm">
-          <p>
+        <CardFooter className="flex flex-col gap-3 text-center text-sm pb-8"> {/* Increased gap and padding */}
+          <p className="text-muted-foreground">
             Don't have an account?{' '}
-            <Link href="/signup" className="underline text-primary hover:text-primary/80">
+            <Link href="/signup" className="font-medium text-primary hover:underline">
               Sign up
             </Link>
           </p>

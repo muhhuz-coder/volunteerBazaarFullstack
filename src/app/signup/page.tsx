@@ -93,15 +93,16 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-secondary p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-1 text-center">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary via-background to-secondary p-4"> {/* Added gradient background */}
+      <Card className="w-full max-w-md shadow-xl border"> {/* Increased shadow */}
+        <CardHeader className="space-y-2 text-center pt-8 pb-4"> {/* Adjusted padding */}
+           <UserPlus className="mx-auto h-10 w-10 text-primary mb-2" /> {/* Added icon */}
           <CardTitle className="text-2xl font-bold text-primary">Create an Account</CardTitle>
-          <CardDescription>Enter your details to sign up</CardDescription>
+          <CardDescription>Join Volunteer Connect today!</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4">
-          <form onSubmit={handleSignup} className="grid gap-4">
-             <div className="grid gap-2">
+        <CardContent className="px-6 pb-6"> {/* Adjusted padding */}
+          <form onSubmit={handleSignup} className="space-y-5"> {/* Increased spacing */}
+             <div className="grid gap-1.5"> {/* Adjusted gap */}
                  {/* Updated label */}
                <Label htmlFor="displayName">Full Name or Organization Name</Label>
                <Input
@@ -111,10 +112,10 @@ export default function SignupPage() {
                  value={displayName}
                  onChange={(e) => setDisplayName(e.target.value)}
                  required
-                 className="bg-background"
+                 className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
                />
              </div>
-            <div className="grid gap-2">
+            <div className="grid gap-1.5"> {/* Adjusted gap */}
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -123,10 +124,10 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-background"
+                className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
               />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-1.5"> {/* Adjusted gap */}
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -135,10 +136,10 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6} // Keep basic validation
-                className="bg-background"
+                className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
               />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-1.5"> {/* Adjusted gap */}
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <Input
                 id="confirmPassword"
@@ -146,17 +147,17 @@ export default function SignupPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="bg-background"
+                className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
               />
             </div>
-             <div className="grid gap-2">
+             <div className="grid gap-1.5"> {/* Adjusted gap */}
                <Label htmlFor="role">I am a...</Label>
                <Select
                  value={role || ''}
                  onValueChange={(value) => setRole(value as UserRole)}
                  required // Keep required validation
                >
-                 <SelectTrigger id="role" className="w-full bg-background">
+                 <SelectTrigger id="role" className="w-full bg-background border-border focus:border-primary focus:ring-primary/50"> {/* Added focus styles */}
                    <SelectValue placeholder="Select your role" />
                  </SelectTrigger>
                  <SelectContent>
@@ -167,9 +168,9 @@ export default function SignupPage() {
                </Select>
              </div>
              {error && (
-               <p className="text-sm text-destructive text-center">{error}</p>
+               <p className="text-sm text-destructive text-center pt-1">{error}</p> // Added top padding
              )}
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={loading}>
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 text-base font-semibold" disabled={loading}> {/* Increased padding/font size */}
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -183,10 +184,10 @@ export default function SignupPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="text-center text-sm">
-          <p>
+        <CardFooter className="text-center text-sm pb-8"> {/* Adjusted padding */}
+          <p className="text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/login" className="underline text-primary hover:text-primary/80">
+            <Link href="/login" className="font-medium text-primary hover:underline">
               Login
             </Link>
           </p>
