@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserCheck, Building } from 'lucide-react';
+// Updated icons
+import { Loader2, HandHeart, Building2 } from 'lucide-react';
 
 export default function SelectRolePage() {
   // Use 'loading' from useAuth directly for initial auth state check
@@ -25,9 +26,9 @@ export default function SelectRolePage() {
       router.push('/login');
       return; // Stop further execution in this effect
     }
-    // Redirect immediately if not loading and user already has a role
+    // Redirect immediately if not loading and user already has a role (updated roles)
     if (!authLoading && user && currentRole) {
-         router.push(currentRole === 'company' ? '/dashboard/company' : '/dashboard/employee');
+         router.push(currentRole === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer');
          return; // Stop further execution in this effect
     }
      // Pre-fill selection if a role exists but redirection didn't happen (edge case)
@@ -56,8 +57,8 @@ export default function SelectRolePage() {
         title: "Role Updated",
         description: `Your role has been set to ${selectedRole}.`,
       });
-      // Redirect to the appropriate dashboard
-      router.push(selectedRole === 'company' ? '/dashboard/company' : '/dashboard/employee');
+      // Redirect to the appropriate dashboard (updated roles)
+      router.push(selectedRole === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer');
     } catch (error) {
       console.error("Failed to set role:", error);
       toast({ title: "Error", description: "Failed to update role. Please try again.", variant: "destructive" });
@@ -81,7 +82,8 @@ export default function SelectRolePage() {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold text-primary">Select Your Role</CardTitle>
-          <CardDescription>Choose whether you are looking for jobs or hiring.</CardDescription>
+           {/* Updated description */}
+          <CardDescription>Choose whether you want to volunteer or represent an organization.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6">
           <RadioGroup
@@ -90,20 +92,26 @@ export default function SelectRolePage() {
             className="grid grid-cols-1 gap-4"
           >
             <Label
-              htmlFor="role-employee"
-              className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${selectedRole === 'employee' ? 'border-primary' : ''}`}
+              htmlFor="role-volunteer" // Updated ID
+              // Updated border check and text
+              className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${selectedRole === 'volunteer' ? 'border-primary' : ''}`}
             >
-              <RadioGroupItem value="employee" id="role-employee" className="sr-only" />
-              <UserCheck className="mb-3 h-6 w-6" />
-              Job Seeker (Employee)
+               {/* Updated value and ID */}
+              <RadioGroupItem value="volunteer" id="role-volunteer" className="sr-only" />
+               {/* Updated icon and text */}
+              <HandHeart className="mb-3 h-6 w-6" />
+              Volunteer
             </Label>
             <Label
-              htmlFor="role-company"
-              className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${selectedRole === 'company' ? 'border-primary' : ''}`}
+              htmlFor="role-organization" // Updated ID
+              // Updated border check and text
+              className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${selectedRole === 'organization' ? 'border-primary' : ''}`}
             >
-              <RadioGroupItem value="company" id="role-company" className="sr-only" />
-              <Building className="mb-3 h-6 w-6" />
-              Employer (Company)
+               {/* Updated value and ID */}
+              <RadioGroupItem value="organization" id="role-organization" className="sr-only" />
+               {/* Updated icon and text */}
+              <Building2 className="mb-3 h-6 w-6" />
+              Organization
             </Label>
           </RadioGroup>
            <Button onClick={handleRoleSelection} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={actionLoading || !selectedRole}>

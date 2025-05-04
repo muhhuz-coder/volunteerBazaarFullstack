@@ -13,7 +13,9 @@ import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const protectedPaths = ['/dashboard/employee', '/dashboard/company', '/select-role'];
+  // Updated protected paths
+  const protectedPaths = ['/dashboard/volunteer', '/dashboard/organization', '/select-role'];
+  // Updated public paths (apply route structure might change)
   const publicPaths = ['/', '/login', '/signup', '/apply'];
   const staticFiles = /\.(.*)$/; // Regex to match static file requests
 
@@ -23,6 +25,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Allow explicitly public paths and the root
+   // Adjusted the check for apply routes potentially having IDs
    if (pathname === '/' || publicPaths.some(p => pathname.startsWith(p))) {
      // Exception: if trying to access /login or /signup while theoretically logged in
      // (middleware can't know for sure), the page component should handle redirection.
@@ -45,21 +48,6 @@ export async function middleware(request: NextRequest) {
 
   // Allow all other requests by default; client-side logic handles auth.
   return NextResponse.next();
-
-  // --- EXAMPLE: Redirect if accessing protected path (commented out as client handles it) ---
-  // This logic *would* redirect, but might conflict with client-side rendering/checks.
-  // const needsLoginRedirect = protectedPaths.some(p => pathname.startsWith(p));
-  // // You would typically check for a session token/cookie here. Since we don't have
-  // // a reliable one, this redirect is based purely on path.
-  // const hasSession = false; // Placeholder - middleware can't access client context easily
-  //
-  // if (needsLoginRedirect && !hasSession) {
-  //    console.log(`Middleware: Redirecting unauthenticated access to ${pathname} to /login.`);
-  //    const loginUrl = new URL('/login', request.url);
-  //    loginUrl.searchParams.set('redirect', pathname);
-  //    return NextResponse.redirect(loginUrl);
-  // }
-  // --- End Example ---
 
 }
 

@@ -10,8 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Job Board Lite', // Updated title
-  description: 'Find your next job opportunity.', // Updated description
+  // Updated title and description
+  title: 'Volunteer Connect',
+  description: 'Find volunteer opportunities or recruit volunteers.',
 };
 
 export default function RootLayout({

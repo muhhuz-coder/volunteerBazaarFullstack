@@ -18,7 +18,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState(''); // Changed label below
   const [role, setRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,13 +39,15 @@ export default function SignupPage() {
     }
 
     if (!role) {
-        setError("Please select a role (Employee or Company).");
+        // Updated error message
+        setError("Please select a role (Volunteer or Organization).");
         setLoading(false);
         toast({ title: "Signup Error", description: "Please select a role.", variant: "destructive" });
         return;
     }
      if (!displayName.trim()) {
-        setError("Please enter your name or company name.");
+         // Updated error message
+        setError("Please enter your name or organization name.");
         setLoading(false);
         toast({ title: "Signup Error", description: "Name cannot be empty.", variant: "destructive" });
         return;
@@ -62,11 +64,11 @@ export default function SignupPage() {
           description: 'Your account has been created.',
         });
 
-        // Redirect based on the selected role
-        if (role === 'company') {
-          router.push('/dashboard/company');
-        } else {
-          router.push('/dashboard/employee');
+        // Redirect based on the selected role (updated roles)
+        if (role === 'organization') {
+          router.push('/dashboard/organization');
+        } else { // 'volunteer'
+          router.push('/dashboard/volunteer');
         }
       } else {
          setError(result.message || 'Signup failed.');
@@ -100,11 +102,12 @@ export default function SignupPage() {
         <CardContent className="grid gap-4">
           <form onSubmit={handleSignup} className="grid gap-4">
              <div className="grid gap-2">
-               <Label htmlFor="displayName">Full Name or Company Name</Label>
+                 {/* Updated label */}
+               <Label htmlFor="displayName">Full Name or Organization Name</Label>
                <Input
                  id="displayName"
                  type="text"
-                 placeholder="John Doe or Acme Inc."
+                 placeholder="Jane Doe or Helping Hands Org" // Updated placeholder
                  value={displayName}
                  onChange={(e) => setDisplayName(e.target.value)}
                  required
@@ -116,7 +119,7 @@ export default function SignupPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -157,8 +160,9 @@ export default function SignupPage() {
                    <SelectValue placeholder="Select your role" />
                  </SelectTrigger>
                  <SelectContent>
-                   <SelectItem value="employee">Job Seeker (Employee)</SelectItem>
-                   <SelectItem value="company">Employer (Company)</SelectItem>
+                    {/* Updated role options */}
+                   <SelectItem value="volunteer">Volunteer</SelectItem>
+                   <SelectItem value="organization">Organization</SelectItem>
                  </SelectContent>
                </Select>
              </div>

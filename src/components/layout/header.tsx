@@ -2,7 +2,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Briefcase, LogOut, LayoutDashboard } from 'lucide-react';
+// Updated icon
+import { HandHeart as AppIcon, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext'; // Using mock context
 import { Button } from '@/components/ui/button';
 import {
@@ -26,17 +27,18 @@ export function Header() {
     return names[0][0].toUpperCase() + (names.length > 1 ? names[names.length - 1][0].toUpperCase() : '');
   };
 
-  // Determine dashboard path, default to home if role not set yet
-  const dashboardPath = role === 'company' ? '/dashboard/company'
-                      : role === 'employee' ? '/dashboard/employee'
+  // Determine dashboard path based on updated roles
+  const dashboardPath = role === 'organization' ? '/dashboard/organization'
+                      : role === 'volunteer' ? '/dashboard/volunteer'
                       : '/select-role'; // Or '/' if prefer home
 
   return (
     <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-40">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2 text-xl md:text-2xl font-bold">
-          <Briefcase className="h-6 w-6 md:h-7 md:w-7" />
-          <span>Job Board Lite</span>
+           {/* Updated icon and title */}
+          <AppIcon className="h-6 w-6 md:h-7 md:w-7" />
+          <span>Volunteer Connect</span>
         </Link>
 
         <div className="flex items-center gap-3">
@@ -67,6 +69,7 @@ export function Header() {
                       {user.email}
                     </p>
                      <p className="text-xs leading-none text-muted-foreground capitalize pt-1">
+                       {/* Display updated role name */}
                       Role: {role || 'Not Set'}
                     </p>
                   </div>
@@ -74,6 +77,7 @@ export function Header() {
                 <DropdownMenuSeparator />
                  {role ? ( // Only show dashboard link if role is set
                     <DropdownMenuItem asChild>
+                        {/* Use updated dashboard path */}
                        <Link href={dashboardPath}>
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         <span>Dashboard</span>

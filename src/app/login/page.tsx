@@ -37,14 +37,13 @@ export default function LoginPage() {
           description: 'Welcome back!',
         });
 
-        // Redirect based on role returned by mock signIn
-        if (result.role === 'company') {
-          router.push('/dashboard/company');
-        } else if (result.role === 'employee') {
-          router.push('/dashboard/employee');
+        // Redirect based on role returned by mock signIn (updated roles)
+        if (result.role === 'organization') {
+          router.push('/dashboard/organization');
+        } else if (result.role === 'volunteer') {
+          router.push('/dashboard/volunteer');
         } else {
           // If role is not set or null, redirect to role selection or default dashboard
-          // This might happen if a mock user was created without a role somehow
           router.push('/select-role'); // Or '/' or a default dashboard
         }
       } else {
@@ -84,7 +83,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

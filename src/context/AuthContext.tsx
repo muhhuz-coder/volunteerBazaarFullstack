@@ -5,7 +5,8 @@ import React, { createContext, useContext, useEffect, useState, ReactNode, useCa
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
-export type UserRole = 'employee' | 'company' | null;
+// Changed roles: employee -> volunteer, company -> organization
+export type UserRole = 'volunteer' | 'organization' | null;
 
 interface UserProfile {
   id: string; // Simple ID (e.g., email or generated string)
@@ -22,7 +23,6 @@ interface AuthContextType {
   signUp: (email: string, pass: string, name: string, role: UserRole) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
   setRoleAndUpdateUser: (role: UserRole) => Promise<void>; // Simplified role setting
-  // Removed fetchUserRole and setRoleInFirestore
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,11 +31,11 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Mock user database (replace with actual storage if needed beyond session)
+// Mock user database with updated roles
 const mockUsers = new Map<string, UserProfile>();
-// Add a default company and employee for testing
-mockUsers.set('company@example.com', { id: 'company@example.com', email: 'company@example.com', displayName: 'Test Company', role: 'company' });
-mockUsers.set('employee@example.com', { id: 'employee@example.com', email: 'employee@example.com', displayName: 'Test Employee', role: 'employee' });
+// Add a default organization and volunteer for testing
+mockUsers.set('organization@example.com', { id: 'organization@example.com', email: 'organization@example.com', displayName: 'Helping Hands Org', role: 'organization' });
+mockUsers.set('volunteer@example.com', { id: 'volunteer@example.com', email: 'volunteer@example.com', displayName: 'Jane Doe Volunteer', role: 'volunteer' });
 
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
@@ -44,10 +44,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [role, setRole] = useState<UserRole>(null);
   const router = useRouter(); // Use router for redirects if needed
 
-  // Simulate checking auth state on load (e.g., from localStorage)
+  // Simulate checking auth state on load
   useEffect(() => {
-     // In a real simple auth, you might check localStorage here
-     // For this example, we start logged out
     setUser(null);
     setRole(null);
     setLoading(false); // No async check needed
@@ -62,8 +60,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const existingUser = mockUsers.get(email);
 
     if (existingUser) {
-      // Simulate password check (in reality, NEVER store plain passwords)
-      // For demo, any password works if user exists
+      // Simulate password check
       setUser(existingUser);
       setRole(existingUser.role);
       setLoading(false);
@@ -111,7 +108,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     await new Promise(res => setTimeout(res, 300)); // Simulate delay
     setUser(null);
     setRole(null);
-    // In a real simple auth, you might clear localStorage here
     setLoading(false);
      // Redirect to home page after sign out
      router.push('/');
