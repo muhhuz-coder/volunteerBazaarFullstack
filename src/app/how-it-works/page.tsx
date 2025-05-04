@@ -2,7 +2,8 @@
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { UserCheck, Building, Search, FileText, Handshake } from 'lucide-react';
+// Updated import: Added Users
+import { UserCheck, Building, Search, FileText, Handshake, Users } from 'lucide-react';
 
 export default function HowItWorksPage() {
   return (
