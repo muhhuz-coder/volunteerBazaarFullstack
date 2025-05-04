@@ -6,36 +6,19 @@ import React, { createContext, useContext, useEffect, useState, ReactNode, useCa
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 // Import types/interfaces from services
-import type { VolunteerApplication } from '@/services/job-board';
+import type { VolunteerApplication, Opportunity } from '@/services/job-board'; // Added Opportunity type
 import type { Conversation } from '@/services/messaging';
 import type { VolunteerStats } from '@/services/gamification';
 // Import persistence utils - We should avoid using fs-dependent utils directly on the client
-// import { readData, writeData, mapToObject, objectToMap } from '@/lib/db-utils';
 
 // Import service functions that interact with persisted data
-import {
-  getConversationsForUser as fetchConversations,
-  createConversation as createNewConversation,
-  getConversationDetails as fetchConversationDetails, // Needed for type
-  sendMessage as postMessage, // Needed for type
-} from '@/services/messaging';
-import {
-  getUserStats as fetchUserStats,
-  getLeaderboard as fetchLeaderboard, // Assuming leaderboard reads persisted data
-  addPoints as addGamificationPoints,
-  awardBadge as awardGamificationBadge,
-} from '@/services/gamification';
-import {
-    submitVolunteerApplication as postApplication,
-    updateApplicationStatus as updateAppStatus, // Import for acceptApplication
-    getApplicationsForOrganization as fetchOrgApplications, // Needed for type
-    getApplicationsForVolunteer as fetchVolunteerApplications, // Needed for type
-} from '@/services/job-board';
+// Services are generally called via Server Actions now
+
 // Import server actions that will handle data persistence
 import { signInUser, signUpUser, updateUserRole } from '@/actions/auth-actions';
-import { acceptVolunteerApplication, submitVolunteerApplicationAction } from '@/actions/application-actions';
+import { acceptVolunteerApplication, rejectVolunteerApplication, submitVolunteerApplicationAction } from '@/actions/application-actions'; // Added reject action
 import { addPointsAction, awardBadgeAction } from '@/actions/gamification-actions';
-import { getUserConversationsAction } from '@/actions/messaging-actions';
+import { getUserConversationsAction, startConversationAction } from '@/actions/messaging-actions'; // Added startConversationAction
 
 
 export type UserRole = 'volunteer' | 'organization' | null;
@@ -56,9 +39,20 @@ interface AuthContextType {
   signUp: (email: string, pass: string, name: string, role: UserRole) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
   setRoleAndUpdateUser: (role: UserRole) => Promise<{ success: boolean; message: string }>;
+  // Application Actions
   submitApplication: (application: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>) => Promise<{ success: boolean; message: string }>;
   acceptApplication: (applicationId: string, volunteerId: string) => Promise<{ success: boolean; message: string; conversationId?: string }>;
-  getUserConversations: () => Promise<Conversation[]>;
+  rejectApplication: (applicationId: string) => Promise<{ success: boolean; message: string }>; // Added reject signature
+  // Messaging Actions
+  getUserConversations: () => Promise<(Conversation & { unreadCount: number })[]>;
+  startConversation: (data: {
+    organizationId: string;
+    opportunityId: string;
+    initialMessage: string;
+    opportunityTitle?: string;
+    organizationName?: string;
+  }) => Promise<{ success: boolean; conversation?: Conversation; error?: string }>; // Added start conversation signature
+  // Gamification Actions
   addPoints: (userId: string, points: number, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
   awardBadge: (userId: string, badgeName: string, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
 }
@@ -77,8 +71,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true); // Start loading until session is checked
   const [role, setRole] = useState<UserRole>(null);
-  // We no longer load the full usersData map on the client
-  // const [usersData, setUsersData] = useState<Map<string, UserProfile>>(new Map());
   const router = useRouter();
 
   // Check session storage on initial client mount
@@ -107,13 +99,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     console.log('Attempting sign in for:', email);
     setLoading(true);
     try {
-        // Call the server action
         const result = await signInUser(email, pass);
-
         if (result.success && result.user) {
             setUser(result.user);
             setRole(result.user.role);
-            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user)); // Persist session simply
+            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
             console.log('Sign in successful via server action:', result.user);
             return { success: true, message: result.message, role: result.user.role };
         } else {
@@ -135,13 +125,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
     setLoading(true);
     try {
-        // Call the server action
         const result = await signUpUser(email, pass, name, roleToSet);
-
         if (result.success && result.user) {
             setUser(result.user);
             setRole(result.user.role);
-            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user)); // Persist session
+            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
             console.log('Sign up successful via server action:', result.user);
             return { success: true, message: result.message };
         } else {
@@ -162,9 +150,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     await sleep(300);
     setUser(null);
     setRole(null);
-    sessionStorage.removeItem('loggedInUser'); // Clear session
+    sessionStorage.removeItem('loggedInUser');
     setLoading(false);
-    router.push('/'); // Redirect to home
+    router.push('/');
     console.log('Sign out complete');
   }, [router]);
 
@@ -179,12 +167,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
      }
      setLoading(true);
      try {
-        // Call the server action
         const result = await updateUserRole(user.id, roleToSet);
         if (result.success && result.user) {
             setUser(result.user);
             setRole(result.user.role);
-            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user)); // Update persisted session
+            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
             console.log(`Role updated to ${roleToSet} for user ${user.email} via server action.`);
             return { success: true, message: result.message };
         } else {
@@ -202,13 +189,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
    // --- Gamification Methods (Call Server Actions) ---
    const addPointsProxy = useCallback(async (userId: string, points: number, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
        try {
-         const result = await addPointsAction(userId, points, reason); // Server action handles persistence
+         const result = await addPointsAction(userId, points, reason);
          if (result.success) {
-             // If the action affects the current user, update their context state
              if (user && user.id === userId && result.newStats) {
                const updatedUser = { ...user, stats: result.newStats };
                setUser(updatedUser);
-               sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
+               sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
              }
              return { success: true, newStats: result.newStats };
          } else {
@@ -223,13 +209,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const awardBadgeProxy = useCallback(async (userId: string, badgeName: string, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
         try {
-          const result = await awardBadgeAction(userId, badgeName, reason); // Server action handles persistence
+          const result = await awardBadgeAction(userId, badgeName, reason);
           if (result.success) {
-              // If the action affects the current user, update their context state
               if (user && user.id === userId && result.newStats) {
                   const updatedUser = { ...user, stats: result.newStats };
                   setUser(updatedUser);
-                  sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser)); // Update session storage
+                  sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
               }
               return { success: true, newStats: result.newStats };
           } else {
@@ -249,20 +234,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!user || user.role !== 'volunteer') {
       return { success: false, message: 'Only logged-in volunteers can apply.' };
     }
-    setLoading(true); // Indicate processing
+    setLoading(true);
     try {
-      // Call the server action for submitting the application
-      const submitResult = await submitVolunteerApplicationAction(applicationData, user.id, user.displayName || user.email); // Pass volunteer details
-
+      const submitResult = await submitVolunteerApplicationAction(applicationData, user.id, user.displayName || user.email);
       if (submitResult.success) {
-        // Award points using the context method (which calls the server action)
         await addPointsProxy(user.id, 5, `Applied for opportunity: ${applicationData.opportunityTitle}`);
         return { success: true, message: submitResult.message };
       } else {
          return { success: false, message: submitResult.message || 'Application submission failed.' };
       }
-
     } catch (error: any) {
+      console.error('Context: Application submission failed:', error);
       return { success: false, message: error.message || 'Application submission failed.' };
     } finally {
       setLoading(false);
@@ -275,57 +257,103 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
      }
      setLoading(true);
      try {
-        // Call the server action to handle accepting the application
         const result = await acceptVolunteerApplication(applicationId, volunteerId, user.id, user.displayName);
-
         if (result.success) {
-             // Award points to the volunteer via the context method (calling the server action)
-            if (result.updatedApp) {
-                await addPointsProxy(volunteerId, 50, `Accepted for opportunity: ${result.updatedApp.opportunityTitle}`);
-            }
+            // Points awarding is handled within the acceptVolunteerApplication action now
+            console.log(`Context: Application ${applicationId} accepted successfully.`);
             return { success: true, message: result.message, conversationId: result.conversationId };
         } else {
-            console.error("Error accepting application via action:", result.message);
+            console.error("Context: Error accepting application via action:", result.message);
             return { success: false, message: result.message || 'Failed to accept application.' };
         }
      } catch (error: any) {
-       console.error("Error accepting application:", error);
+       console.error("Context: Error accepting application:", error);
        return { success: false, message: error.message || 'Failed to accept application.' };
      } finally {
        setLoading(false);
      }
-   }, [user, addPointsProxy]);
+   }, [user]); // Removed addPointsProxy dependency
 
-    const getUserConversations = useCallback(async (): Promise<Conversation[]> => {
+  const rejectApplication = useCallback(async (applicationId: string): Promise<{ success: boolean; message: string }> => {
+       if (!user || user.role !== 'organization') {
+           return { success: false, message: 'Only logged-in organizations can reject applications.' };
+       }
+       setLoading(true);
+       try {
+           const result = await rejectVolunteerApplication(applicationId);
+           if (result.success) {
+               console.log(`Context: Application ${applicationId} rejected successfully.`);
+               return { success: true, message: result.message };
+           } else {
+               console.error("Context: Error rejecting application via action:", result.message);
+               return { success: false, message: result.message || 'Failed to reject application.' };
+           }
+       } catch (error: any) {
+           console.error("Context: Error rejecting application:", error);
+           return { success: false, message: error.message || 'Failed to reject application.' };
+       } finally {
+           setLoading(false);
+       }
+   }, [user]);
+
+    const getUserConversations = useCallback(async (): Promise<(Conversation & { unreadCount: number })[]> => {
         if (!user || !user.role) {
-          console.error("Cannot get conversations: User not logged in or role not set.");
+          console.error("Context: Cannot get conversations: User not logged in or role not set.");
           return [];
         }
-        // setLoading(true); // Optional: Show loading specifically for conversation fetch
         try {
-          // Call the server action
           const conversations = await getUserConversationsAction(user.id, user.role);
           return conversations;
         } catch (error: any) {
-          console.error("Failed to fetch conversations via action:", error);
-          return []; // Return empty on error
-        } finally {
-             // setLoading(false);
+          console.error("Context: Failed to fetch conversations via action:", error);
+          return [];
         }
       }, [user]);
 
+    const startConversation = useCallback(async (data: {
+        organizationId: string;
+        opportunityId: string;
+        initialMessage: string;
+        opportunityTitle?: string;
+        organizationName?: string;
+      }): Promise<{ success: boolean; conversation?: Conversation; error?: string }> => {
+        if (!user || user.role !== 'volunteer') {
+            return { success: false, error: 'Only logged-in volunteers can start conversations.' };
+        }
+         if (!data.initialMessage.trim()) {
+            return { success: false, error: "Initial message cannot be empty." };
+         }
+        setLoading(true);
+        try {
+            const result = await startConversationAction({
+                ...data,
+                volunteerId: user.id,
+                volunteerName: user.displayName, // Pass volunteer name from context
+            });
+            if (result.success) {
+                 console.log(`Context: Conversation started/retrieved successfully: ${result.conversation?.id}`);
+                 return { success: true, conversation: result.conversation };
+            } else {
+                 console.error("Context: Error starting conversation via action:", result.error);
+                 return { success: false, error: result.error || 'Failed to start conversation.' };
+            }
+        } catch (error: any) {
+            console.error("Context: Error starting conversation:", error);
+            return { success: false, error: error.message || 'Failed to start conversation.' };
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
 
 
   // Initial loading state UI
   if (loading) {
     return (
        <div className="flex flex-col min-h-screen">
-         {/* Simplified Skeleton Header */}
          <div className="bg-primary h-14 flex items-center justify-between px-4">
            <Skeleton className="h-7 w-48 bg-primary/50" />
            <Skeleton className="h-9 w-9 rounded-full bg-primary/50" />
          </div>
-         {/* Simplified Skeleton Body */}
          <div className="flex-grow container mx-auto px-4 py-8">
            <Skeleton className="h-64 w-full bg-muted" />
          </div>
@@ -344,9 +372,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setRoleAndUpdateUser,
         submitApplication,
         acceptApplication,
+        rejectApplication, // Add rejectApplication to context value
         getUserConversations,
-        addPoints: addPointsProxy, // Use the proxy function
-        awardBadge: awardBadgeProxy, // Use the proxy function
+        startConversation, // Add startConversation to context value
+        addPoints: addPointsProxy,
+        awardBadge: awardBadgeProxy,
      }}>
       {children}
     </AuthContext.Provider>
@@ -360,3 +390,5 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+    

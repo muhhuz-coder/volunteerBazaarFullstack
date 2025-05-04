@@ -1,6 +1,7 @@
+
 'use server';
 // src/services/messaging.ts
-import { readData, writeData } from '@/lib/db-utils';
+import { readData, writeData, dateReviver } from '@/lib/db-utils'; // Import dateReviver
 
 /**
  * Represents a single message within a conversation.
@@ -10,7 +11,7 @@ export interface Message {
     conversationId: string;
     senderId: string;
     text: string;
-    timestamp: Date | string; // Allow string for reading
+    timestamp: Date; // Use Date type consistently
     isRead?: boolean;
 }
 
@@ -22,14 +23,14 @@ export interface Conversation {
     organizationId: string;
     volunteerId: string;
     opportunityId: string;
-    opportunityTitle?: string;
-    organizationName?: string;
-    volunteerName?: string;
+    opportunityTitle?: string; // Title of the related opportunity
+    organizationName?: string; // Name of the organization
+    volunteerName?: string; // Name of the volunteer
     messages: Message[]; // Embedded messages for simplicity in JSON
-    lastMessage?: Message; // Stored as object, will need date parsing
-    unreadCount?: number; // Transient, calculated on retrieval
-    createdAt: Date | string; // Allow string for reading
-    updatedAt: Date | string; // Allow string for reading
+    lastMessage?: Message; // Store the latest message object
+    createdAt: Date; // Use Date type consistently
+    updatedAt: Date; // Use Date type consistently
+    // unreadCount is calculated dynamically and not stored
 }
 
 // File name for JSON data
@@ -42,28 +43,27 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Load data dynamically within functions to ensure server-side execution context
 
 async function loadConversationsData(): Promise<Conversation[]> {
-    const rawConversations = await readData<Conversation[]>(CONVERSATIONS_FILE, []);
-    // Parse dates within conversations and messages
-    return rawConversations.map(convo => ({
-        ...convo,
-        createdAt: typeof convo.createdAt === 'string' ? new Date(convo.createdAt) : convo.createdAt,
-        updatedAt: typeof convo.updatedAt === 'string' ? new Date(convo.updatedAt) : convo.updatedAt,
-        lastMessage: convo.lastMessage ? {
-            ...convo.lastMessage,
-            timestamp: typeof convo.lastMessage.timestamp === 'string' ? new Date(convo.lastMessage.timestamp) : convo.lastMessage.timestamp,
-        } : undefined,
-        messages: convo.messages.map(msg => ({
-            ...msg,
-            timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : msg.timestamp,
-        })),
-    }));
+    // readData now uses dateReviver internally, so dates should be parsed correctly
+    const conversations = await readData<Conversation[]>(CONVERSATIONS_FILE, []);
+    // Ensure nested dates within messages are also handled if dateReviver doesn't catch them deeply (though it should)
+    conversations.forEach(convo => {
+        convo.createdAt = new Date(convo.createdAt);
+        convo.updatedAt = new Date(convo.updatedAt);
+        if (convo.lastMessage) {
+            convo.lastMessage.timestamp = new Date(convo.lastMessage.timestamp);
+        }
+        convo.messages.forEach(msg => {
+            msg.timestamp = new Date(msg.timestamp);
+        });
+    });
+    return conversations;
 }
 
 
 /**
- * Creates a new conversation.
- * @param data Object containing organizationId, volunteerId, opportunityId, and initialMessage.
- * @returns A promise that resolves to the newly created Conversation object.
+ * Creates a new conversation or returns an existing one for the same participants and opportunity.
+ * @param data Object containing participant IDs, opportunity details, and initial message.
+ * @returns A promise that resolves to the Conversation object (new or existing).
  */
 export async function createConversation(data: {
     organizationId: string;
@@ -85,16 +85,9 @@ export async function createConversation(data: {
      );
      if (existingConvo) {
         console.log("Conversation already exists:", existingConvo.id);
-         // Ensure dates are Date objects before returning
-         return {
-            ...existingConvo,
-            createdAt: new Date(existingConvo.createdAt),
-            updatedAt: new Date(existingConvo.updatedAt),
-            lastMessage: existingConvo.lastMessage ? { ...existingConvo.lastMessage, timestamp: new Date(existingConvo.lastMessage.timestamp) } : undefined,
-            messages: existingConvo.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }))
-         };
+         // Ensure dates are Date objects before returning (loadConversationsData should handle this)
+         return { ...existingConvo }; // Return a copy
      }
-
 
     const conversationId = `convo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -103,10 +96,10 @@ export async function createConversation(data: {
     const initialMsg: Message = {
         id: messageId,
         conversationId: conversationId,
-        senderId: data.organizationId,
+        senderId: data.organizationId, // Assuming org sends the initial message
         text: data.initialMessage,
         timestamp: now,
-        isRead: false,
+        isRead: false, // Initially unread by the volunteer
     };
 
     const newConversation: Conversation = {
@@ -114,9 +107,9 @@ export async function createConversation(data: {
         organizationId: data.organizationId,
         volunteerId: data.volunteerId,
         opportunityId: data.opportunityId,
-        opportunityTitle: data.opportunityTitle,
-        organizationName: data.organizationName,
-        volunteerName: data.volunteerName,
+        opportunityTitle: data.opportunityTitle || 'Unknown Opportunity',
+        organizationName: data.organizationName || `Org (${data.organizationId.substring(0, 4)})`,
+        volunteerName: data.volunteerName || `Volunteer (${data.volunteerId.substring(0, 4)})`,
         messages: [initialMsg],
         lastMessage: initialMsg,
         createdAt: now,
@@ -132,13 +125,13 @@ export async function createConversation(data: {
 }
 
 /**
- * Retrieves all conversations for a specific user.
- * Calculates unread count dynamically.
+ * Retrieves all conversations for a specific user, adding unread count.
+ * Sorts conversations by the timestamp of the last message (most recent first).
  * @param userId The ID of the user.
  * @param userRole The role of the user ('volunteer' or 'organization').
- * @returns A promise that resolves to an array of Conversation objects.
+ * @returns A promise that resolves to an array of Conversation objects augmented with unreadCount.
  */
-export async function getConversationsForUser(userId: string, userRole: 'volunteer' | 'organization'): Promise<Conversation[]> {
+export async function getConversationsForUser(userId: string, userRole: 'volunteer' | 'organization'): Promise<(Conversation & { unreadCount: number })[]> {
     await sleep(150); // Simulate minimal delay
     const conversationsData = await loadConversationsData(); // Load current data
 
@@ -152,21 +145,20 @@ export async function getConversationsForUser(userId: string, userRole: 'volunte
 
     // Calculate unread count and ensure dates are Date objects
     const conversationsWithUnread = userConversations.map(convo => {
+        // Count messages *not* sent by the current user that are *not* marked as read
         const unreadCount = convo.messages.filter(msg => msg.senderId !== userId && !msg.isRead).length;
+        // loadConversationsData should have handled date conversion already
         return {
              ...convo,
-             unreadCount,
-             createdAt: new Date(convo.createdAt),
-             updatedAt: new Date(convo.updatedAt),
-             lastMessage: convo.lastMessage ? { ...convo.lastMessage, timestamp: new Date(convo.lastMessage.timestamp) } : undefined,
-             messages: convo.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) })) // Keep messages if needed, ensure dates
+             unreadCount, // Add dynamically calculated unread count
             };
     });
 
      // Sort by last message timestamp (most recent first)
      conversationsWithUnread.sort((a, b) => {
-        const timeA = a.lastMessage?.timestamp instanceof Date ? a.lastMessage.timestamp.getTime() : new Date(a.createdAt).getTime();
-        const timeB = b.lastMessage?.timestamp instanceof Date ? b.lastMessage.timestamp.getTime() : new Date(b.createdAt).getTime();
+        // Use updatedAt as a proxy for last activity time, as lastMessage might not exist initially
+        const timeA = a.lastMessage ? a.lastMessage.timestamp.getTime() : a.updatedAt.getTime();
+        const timeB = b.lastMessage ? b.lastMessage.timestamp.getTime() : b.updatedAt.getTime();
         return timeB - timeA; // Descending order
      });
 
@@ -188,12 +180,12 @@ export async function getConversationDetails(conversationId: string, userId: str
     let conversationsData = await loadConversationsData(); // Load current data
 
     const conversationIndex = conversationsData.findIndex(convo => convo.id === conversationId);
-    const conversation = conversationIndex !== -1 ? conversationsData[conversationIndex] : undefined;
 
 
-    if (!conversation) {
+    if (conversationIndex === -1) {
         throw new Error('Conversation not found.');
     }
+    const conversation = conversationsData[conversationIndex];
 
     // Check access rights
     if ((userRole === 'volunteer' && conversation.volunteerId !== userId) ||
@@ -204,43 +196,35 @@ export async function getConversationDetails(conversationId: string, userId: str
     // Mark messages sent by the *other* party as read
     let updated = false;
     conversation.messages.forEach(msg => {
+        // Ensure timestamp is Date object (should be done by loadConversationsData)
+        msg.timestamp = new Date(msg.timestamp);
         if (msg.senderId !== userId && !msg.isRead) {
             msg.isRead = true;
              updated = true;
         }
-         // Ensure timestamp is Date object
-         msg.timestamp = new Date(msg.timestamp);
     });
 
      if (updated) {
         conversation.updatedAt = new Date(); // Update timestamp on read
+        // Update the conversation in the array
+        conversationsData[conversationIndex] = conversation;
         // Save changes back to file
         await writeData(CONVERSATIONS_FILE, conversationsData);
         console.log(`Marked messages as read for user ${userId} in conversation ${conversationId} and saved.`);
      }
 
-     // Sort messages by timestamp (oldest first)
-     const sortedMessages = [...conversation.messages].sort((a, b) => (a.timestamp as Date).getTime() - (b.timestamp as Date).getTime());
+     // Sort messages by timestamp (oldest first) for display
+     const sortedMessages = [...conversation.messages].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
 
-    // Return conversation details (without unread count) and sorted messages
-     // Ensure dates are Date objects before returning
-     const { unreadCount, ...convoDetails } = conversation;
-     const finalConvoDetails = {
-        ...convoDetails,
-        createdAt: new Date(convoDetails.createdAt),
-        updatedAt: new Date(convoDetails.updatedAt),
-        lastMessage: convoDetails.lastMessage ? { ...convoDetails.lastMessage, timestamp: new Date(convoDetails.lastMessage.timestamp) } : undefined,
-        // messages are returned separately
-     };
-
-
-    return { conversation: finalConvoDetails, messages: sortedMessages };
+    // Return conversation details and sorted messages
+    // The conversation object from the array already has Date objects due to loadConversationsData
+    return { conversation: { ...conversation }, messages: sortedMessages };
 }
 
 /**
  * Sends a new message within a conversation.
- * Adds the message and updates the conversation in the JSON file.
+ * Adds the message, updates the conversation's last message and timestamp, and saves.
  * @param conversationId The ID of the conversation.
  * @param senderId The ID of the user sending the message.
  * @param text The content of the message.
@@ -251,16 +235,16 @@ export async function sendMessage(conversationId: string, senderId: string, text
     let conversationsData = await loadConversationsData(); // Load current data
 
     const conversationIndex = conversationsData.findIndex(convo => convo.id === conversationId);
-    const conversation = conversationIndex !== -1 ? conversationsData[conversationIndex] : undefined;
 
-    if (!conversation) {
+    if (conversationIndex === -1) {
         throw new Error('Conversation not found.');
     }
+    const conversation = conversationsData[conversationIndex];
 
+     // Validate sender is part of the conversation
      if (senderId !== conversation.volunteerId && senderId !== conversation.organizationId) {
         throw new Error('Sender is not part of this conversation.');
      }
-
 
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date();
@@ -271,21 +255,25 @@ export async function sendMessage(conversationId: string, senderId: string, text
         senderId: senderId,
         text: text,
         timestamp: now,
-        isRead: false,
+        isRead: false, // New messages start as unread for the recipient
     };
 
-    // Update conversation in the data array
+    // Add message to the conversation's message list
     conversation.messages.push(newMessage);
+    // Update last message and timestamp
     conversation.lastMessage = newMessage;
     conversation.updatedAt = now;
 
-    // Ensure other dates are Date objects before saving
+    // Ensure other dates are Date objects before saving (should be redundant if load works)
     conversation.createdAt = new Date(conversation.createdAt);
+    if (conversation.lastMessage) {
+       conversation.lastMessage.timestamp = new Date(conversation.lastMessage.timestamp);
+    }
     conversation.messages.forEach(m => m.timestamp = new Date(m.timestamp));
-     if (conversation.lastMessage) {
-        conversation.lastMessage.timestamp = new Date(conversation.lastMessage.timestamp);
-     }
 
+
+    // Update the conversation in the main array
+    conversationsData[conversationIndex] = conversation;
 
     // Save the updated conversations data back to the file
     await writeData(CONVERSATIONS_FILE, conversationsData);
@@ -293,3 +281,5 @@ export async function sendMessage(conversationId: string, senderId: string, text
     console.log('Message sent and conversation saved:', newMessage);
     return { ...newMessage }; // Return a copy
 }
+
+    

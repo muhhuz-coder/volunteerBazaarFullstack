@@ -13,8 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-// Remove direct service imports, use server actions via AuthContext or action imports
-// import { getConversationDetails, sendMessage, type Conversation, type Message } from '@/services/messaging';
 import type { Conversation, Message } from '@/services/messaging'; // Keep types
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -35,6 +33,7 @@ export default function ConversationPage() {
     const [loadingConversation, setLoadingConversation] = useState(true);
     const [newMessage, setNewMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
+    const [error, setError] = useState<string | null>(null); // Add error state
 
     const getInitials = (name?: string | null): string => {
        if (!name) return 'U';
@@ -43,7 +42,7 @@ export default function ConversationPage() {
        if (names.length > 1 && names[0].length > 0 && names[names.length - 1].length > 0) {
            return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
        }
-       return name.length > 0 ? name[0].toUpperCase() : 'U'; // Fallback for single long name or empty strings
+       return name.length > 0 ? name[0].toUpperCase() : 'U';
     };
 
      // Function to get display name based on sender ID using conversation details
@@ -52,53 +51,53 @@ export default function ConversationPage() {
         if (senderId === user.id) return "You";
 
         if (senderId === conversation.organizationId) {
-            return conversation.organizationName || `Organization (${senderId.substring(0, 4)})`;
+            return conversation.organizationName || `Organization (${conversation.organizationId.substring(0, 4)})`;
         } else if (senderId === conversation.volunteerId) {
-            return conversation.volunteerName || `Volunteer (${senderId.substring(0, 4)})`;
+            return conversation.volunteerName || `Volunteer (${conversation.volunteerId.substring(0, 4)})`;
         }
-        return "Unknown"; // Fallback
+        return "Unknown";
     };
 
 
     const fetchConversationData = useCallback(async () => {
-        if (user && conversationId && user.role) { // Ensure role is available
-            setLoadingConversation(true);
-            try {
-                // Call the server action to get details
-                const result = await getConversationDetailsAction(conversationId, user.id, user.role);
-                if ('error' in result) {
-                    throw new Error(result.error);
-                }
-                setConversation(result.conversation);
-                // Convert string timestamps back to Date objects if necessary (action might already do this)
-                const processedMessages = result.messages.map(msg => ({
-                    ...msg,
-                    timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : msg.timestamp
-                }));
-                setMessages(processedMessages);
-                 // Server action now handles marking as read
-            } catch (error: any) {
-                console.error("Failed to fetch conversation details:", error);
-                toast({ title: 'Error', description: error.message || 'Could not load conversation.', variant: 'destructive' });
-                 setConversation(null); // Ensure conversation is null on error
-            } finally {
-                setLoadingConversation(false);
-            }
-        } else if (user && !user.role) {
-             console.error("User role not set, cannot fetch conversation details.");
-             toast({ title: 'Error', description: 'User role not set.', variant: 'destructive' });
-             setLoadingConversation(false);
-             setConversation(null);
+        if (!user || !conversationId || !user.role) {
+            setLoadingConversation(false); // Stop loading if preconditions aren't met
+            return;
         }
-    }, [user, conversationId, toast]); // Removed router dependency as it's not used in fetch logic
+
+        setLoadingConversation(true);
+        setError(null); // Reset error state
+        try {
+            const result = await getConversationDetailsAction(conversationId, user.id, user.role);
+            if ('error' in result) {
+                throw new Error(result.error);
+            }
+            // Ensure dates are Date objects (actions should return them as such)
+            setConversation(result.conversation);
+            setMessages(result.messages);
+        } catch (error: any) {
+            console.error("Failed to fetch conversation details:", error);
+            toast({ title: 'Error', description: error.message || 'Could not load conversation.', variant: 'destructive' });
+            setError(error.message || 'Could not load conversation.');
+            setConversation(null);
+            setMessages([]);
+        } finally {
+            setLoadingConversation(false);
+        }
+    }, [user, conversationId, toast]); // Removed user.role from deps as it's stable once user is set
 
     useEffect(() => {
         if (!authLoading && !user) {
             router.push('/login');
-        } else if (user) {
+        } else if (user && user.role) { // Ensure role exists before fetching
             fetchConversationData();
+        } else if (user && !user.role && !authLoading) {
+             // Handle case where user is logged in but role is null (shouldn't normally happen after login/signup)
+            setError("User role not set. Cannot load messages.");
+            setLoadingConversation(false);
         }
-    }, [user, authLoading, router, fetchConversationData]);
+        // Add conversationId to dependency array to refetch if it changes (though unlikely in this setup)
+    }, [user, authLoading, router, fetchConversationData, conversationId]);
 
 
      // Scroll to bottom when messages change
@@ -115,17 +114,11 @@ export default function ConversationPage() {
 
         setIsSending(true);
         try {
-             // Call the server action to send the message
              const result = await sendMessageAction(conversationId, user.id, newMessage.trim());
-
              if (result.success && result.message) {
-                 // Convert string timestamp back to Date if necessary
-                 const sentMessage = {
-                     ...result.message,
-                     timestamp: typeof result.message.timestamp === 'string' ? new Date(result.message.timestamp) : result.message.timestamp
-                 };
-                 setMessages(prev => [...prev, sentMessage]); // Add new message
-                 setNewMessage(''); // Clear input
+                 // Ensure timestamp is a Date object (action should guarantee this)
+                 setMessages(prev => [...prev, result.message!]);
+                 setNewMessage('');
              } else {
                  throw new Error(result.error || 'Failed to send message.');
              }
@@ -138,38 +131,68 @@ export default function ConversationPage() {
     };
 
 
-    if (authLoading || (user && loadingConversation)) {
+    if (authLoading || (user && loadingConversation && !error)) { // Show skeleton only if loading and no error
         return (
             <div className="flex flex-col min-h-screen bg-secondary">
                 <Header />
                 <div className="container mx-auto px-4 py-8 flex-grow">
-                    <Skeleton className="h-8 w-48 mb-4" />
+                     <Skeleton className="h-8 w-32 mb-4" /> {/* Back button skeleton */}
                      <Card className="shadow-lg border w-full max-w-2xl mx-auto">
-                        <CardHeader>
+                        <CardHeader className="border-b"> {/* Added border */}
                              <Skeleton className="h-6 w-3/4" />
                              <Skeleton className="h-4 w-1/2 mt-1" />
                         </CardHeader>
-                         <CardContent className="h-96 space-y-4 overflow-y-auto p-4">
+                         {/* Ensure proper height and padding for scrollable content */}
+                         <CardContent className="h-[60vh] space-y-4 overflow-y-auto p-4">
                              {[...Array(5)].map((_, i) => (
-                               <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
-                                  <Skeleton className="h-10 w-3/5 rounded-lg" />
+                               <div key={i} className={`flex items-start gap-3 ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                                  {i % 2 === 0 && <Skeleton className="h-8 w-8 rounded-full" />}
+                                  <Skeleton className="h-10 w-3/5 rounded-lg p-3" />
+                                  {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full" />}
                                </div>
                              ))}
                          </CardContent>
-                         <CardFooter>
-                            <Skeleton className="h-16 w-full" />
+                         <CardFooter className="border-t pt-4"> {/* Added border and padding */}
+                            {/* More detailed skeleton for input area */}
+                            <div className="flex w-full items-center gap-2">
+                                <Skeleton className="h-16 flex-grow rounded-md" />
+                                <Skeleton className="h-10 w-10 rounded-md" />
+                            </div>
                          </CardFooter>
                      </Card>
                 </div>
-                <footer className="bg-primary p-4 mt-auto">
+                <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
                     <Skeleton className="h-4 w-1/3 mx-auto" />
                 </footer>
             </div>
         );
     }
 
+     // Handle explicit error state
+     if (error) {
+         return (
+              <div className="flex flex-col min-h-screen bg-secondary">
+                <Header />
+                <div className="flex-grow flex flex-col justify-center items-center text-center px-4">
+                  <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                  <h2 className="text-2xl font-semibold mb-2">Error Loading Conversation</h2>
+                  <p className="text-muted-foreground mb-4">{error}</p>
+                   <Button asChild variant="outline">
+                     <Link href="/dashboard/messages">
+                       <ArrowLeft className="mr-2 h-4 w-4" /> Back to Inbox
+                     </Link>
+                   </Button>
+                </div>
+                 <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+                    <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+                 </footer>
+              </div>
+            );
+     }
+
+
+     // Handle user not logged in (should be caught by effect, but good fallback)
      if (!user) {
-        // Redirect handled by useEffect
         return (
              <div className="flex flex-col min-h-screen bg-secondary">
                <Header />
@@ -185,16 +208,16 @@ export default function ConversationPage() {
            );
      }
 
+    // Handle case where loading finished but conversation is still null (and no error string set)
     if (!conversation) {
-         // Handle case where conversation couldn't be loaded
          return (
               <div className="flex flex-col min-h-screen bg-secondary">
                 <Header />
                 <div className="flex-grow flex flex-col justify-center items-center text-center px-4">
                   <AlertCircle className="h-12 w-12 text-destructive mb-4" />
                   <h2 className="text-2xl font-semibold mb-2">Conversation Not Found</h2>
-                  <p className="text-muted-foreground mb-4">Could not load the requested conversation, or you may not have access.</p>
-                   <Button asChild>
+                  <p className="text-muted-foreground mb-4">Could not load the requested conversation details.</p>
+                   <Button asChild variant="outline">
                      <Link href="/dashboard/messages">
                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Inbox
                      </Link>
@@ -208,6 +231,9 @@ export default function ConversationPage() {
     }
 
 
+    // Determine the other party's name for the header
+    const otherPartyName = getSenderName(user.role === 'organization' ? conversation.volunteerId : conversation.organizationId);
+
     return (
         <div className="flex flex-col min-h-screen bg-secondary">
             <Header />
@@ -220,30 +246,29 @@ export default function ConversationPage() {
 
                 <Card className="shadow-lg border w-full max-w-2xl mx-auto flex-grow flex flex-col">
                     <CardHeader className="border-b">
-                        {/* Use conversation details for the title */}
-                        <CardTitle>Conversation with {getSenderName(user.role === 'organization' ? conversation.volunteerId : conversation.organizationId)}</CardTitle>
+                        <CardTitle>Conversation with {otherPartyName}</CardTitle>
                         <CardDescription>Regarding: {conversation.opportunityTitle || 'General Inquiry'}</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex-grow overflow-y-auto p-4 space-y-4">
+                     {/* Adjust height dynamically, e.g., using viewport height minus header/footer */}
+                    <CardContent className="flex-grow overflow-y-auto p-4 space-y-4 h-[calc(100vh-20rem)]"> {/* Example height */}
                         {messages.map((msg) => (
                             <div
                                 key={msg.id}
                                 className={cn(
-                                    "flex items-start gap-3",
+                                    "flex items-end gap-3", // Align items to bottom for better time display
                                     msg.senderId === user.id ? "justify-end" : "justify-start"
                                 )}
                             >
                                 {msg.senderId !== user.id && (
                                     <Avatar className="h-8 w-8">
                                         <AvatarFallback className="text-xs">
-                                             {/* Use getSenderName and getInitials */}
                                             {getInitials(getSenderName(msg.senderId))}
                                         </AvatarFallback>
                                     </Avatar>
                                 )}
                                 <div
                                     className={cn(
-                                        "max-w-[75%] rounded-lg p-3 text-sm",
+                                        "max-w-[75%] rounded-lg p-3 text-sm shadow-sm", // Added shadow
                                         msg.senderId === user.id
                                             ? "bg-primary text-primary-foreground"
                                             : "bg-muted text-foreground"
@@ -251,20 +276,19 @@ export default function ConversationPage() {
                                 >
                                     <p>{msg.text}</p>
                                      <p className={cn(
-                                          "text-xs mt-1",
+                                          "text-xs mt-1.5", // Increased margin
                                           msg.senderId === user.id ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-left"
                                       )}>
                                           {/* Ensure timestamp is a Date object */}
                                          {msg.timestamp instanceof Date
                                              ? msg.timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                                             : 'Invalid Date' // Handle cases where it might still not be a date
+                                             : 'Invalid Date'
                                          }
                                      </p>
                                 </div>
                                  {msg.senderId === user.id && (
                                      <Avatar className="h-8 w-8">
                                          <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                                             {/* Use getSenderName and getInitials */}
                                              {getInitials(getSenderName(msg.senderId))}
                                          </AvatarFallback>
                                      </Avatar>
@@ -282,6 +306,13 @@ export default function ConversationPage() {
                                 className="flex-grow resize-none bg-background"
                                 rows={1}
                                 disabled={isSending}
+                                // Handle Shift+Enter for new line, Enter to send
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault(); // Prevent newline on Enter
+                                        handleSendMessage(e); // Submit form
+                                    }
+                                }}
                             />
                             <Button type="submit" size="icon" disabled={!newMessage.trim() || isSending}>
                                 {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -297,3 +328,5 @@ export default function ConversationPage() {
         </div>
     );
 }
+
+    

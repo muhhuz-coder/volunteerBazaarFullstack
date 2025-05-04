@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -73,13 +74,14 @@ const AlertDialogFooter = ({
 )
 AlertDialogFooter.displayName = "AlertDialogFooter"
 
+// Ensure AlertDialogTitle is exported
 const AlertDialogTitle = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Title
     ref={ref}
-    className={cn("text-lg font-semibold", className)}
+    className={cn("text-lg font-semibold", className)} // Keep base styles
     {...props}
   />
 ))
@@ -134,8 +136,10 @@ export {
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogFooter,
-  AlertDialogTitle,
+  AlertDialogTitle, // Export the Title component
   AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
 }
+
+    
