@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Add font loader configuration if needed, though Inter is often handled well by default
+  // experimental: {
+  //   fontLoaders: [
+  //     { loader: '@next/font/google', options: { subsets: ['latin'] } },
+  //   ],
+  // },
 };
 
 export default nextConfig;
