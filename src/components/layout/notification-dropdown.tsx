@@ -18,6 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import type { UserNotification } from '@/services/notification';
 import { getUserNotificationsAction, markNotificationReadAction, markAllNotificationsReadAction } from '@/actions/notification-actions';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // Import Link component
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area'; // Import ScrollArea
