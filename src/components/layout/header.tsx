@@ -1,9 +1,11 @@
+
 // src/components/layout/header.tsx
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image'; // Import Image
 // Updated icon and added MessageSquare, Star, BarChart3 for Analytics
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3 } from 'lucide-react';
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit } from 'lucide-react'; // Added Edit
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Import AvatarImage
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Sheet,
@@ -99,6 +101,9 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-primary-foreground/10">
                   <Avatar className="h-9 w-9">
+                    {user.profilePictureUrl && (
+                       <AvatarImage src={user.profilePictureUrl} alt={user.displayName || 'Profile Picture'} />
+                    )}
                     <AvatarFallback className="bg-primary-foreground text-primary font-semibold">
                       {getInitials(user.displayName || user.email)}
                     </AvatarFallback>
@@ -135,6 +140,12 @@ export function Header() {
                          <span>Dashboard</span>
                         </Link>
                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/profile/edit"> {/* Added Edit Profile Link */}
+                          <Edit className="mr-2 h-4 w-4" />
+                          <span>Edit Profile</span>
+                        </Link>
+                      </DropdownMenuItem>
                      <DropdownMenuItem asChild>
                          <Link href="/dashboard/messages">
                           <MessageSquare className="mr-2 h-4 w-4" />
@@ -197,6 +208,12 @@ export function Header() {
                        <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base" onClick={closeMobileMenu}>
                          <Link href={dashboardPath} className="flex items-center">
                            <LayoutDashboard className="mr-2 h-5 w-5" /> Dashboard
+                         </Link>
+                       </Button>
+                       {/* Add edit profile link to mobile menu */}
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base" onClick={closeMobileMenu}>
+                         <Link href="/profile/edit" className="flex items-center">
+                           <Edit className="mr-2 h-5 w-5" /> Edit Profile
                          </Link>
                        </Button>
                        {/* Add messages link to mobile menu if logged in */}

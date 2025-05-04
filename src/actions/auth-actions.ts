@@ -20,17 +20,19 @@ export async function signInUser(email: string, pass: string): Promise<{ success
     const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
     const usersData = objectToMap(usersObject);
     let existingUser: UserProfile | undefined;
+    let userEmailKey: string | undefined; // Store the original key
 
     // Find user by email - case-insensitive comparison might be better in real scenarios
     for (const [storedEmail, profile] of usersData.entries()) {
         if (storedEmail.toLowerCase() === email.toLowerCase()) {
             existingUser = profile;
+            userEmailKey = storedEmail; // Store the key used in the map
             break;
         }
     }
 
 
-    if (existingUser) {
+    if (existingUser && userEmailKey) {
       // Simulate password check (in a real app, hash and compare)
       // if (await bcrypt.compare(pass, existingUser.passwordHash)) { // Example with bcrypt
       // }
@@ -101,6 +103,7 @@ export async function signUpUser(email: string, pass: string, name: string, role
       displayName: name,
       role: roleToSet,
       stats: roleToSet === 'volunteer' ? { points: 0, badges: [], hours: 0 } : undefined,
+      profilePictureUrl: undefined, // Initialize profile picture URL
       // passwordHash: passwordHash, // Store hash, not password
     };
 
@@ -202,12 +205,12 @@ export async function getRefreshedUserAction(userId: string): Promise<{ success:
         for (const [email, profile] of usersData.entries()) {
             if (profile.id === userId) {
                 userProfile = profile;
-                userEmail = email; // Store email in case we need it (though not strictly needed here)
+                userEmail = email; // Store email in case we need it
                 break;
             }
         }
 
-        if (!userProfile) {
+        if (!userProfile || !userEmail) {
             console.log('Server Action: Refresh failed, user not found:', userId);
             return { success: false, message: 'User not found.' };
         }
@@ -237,4 +240,54 @@ export async function getRefreshedUserAction(userId: string): Promise<{ success:
         console.error("Server Action: User refresh error -", error);
         return { success: false, message: 'Server error during user refresh.' };
     }
+}
+
+
+/**
+ * Server action to update a user's profile picture URL (Data URI).
+ */
+export async function updateUserProfilePictureAction(userId: string, imageDataUri: string): Promise<{ success: boolean; message: string; user?: UserProfile | null }> {
+  console.log(`Server Action: Updating profile picture for user ID: ${userId}`);
+
+  if (!imageDataUri || !imageDataUri.startsWith('data:image')) {
+    return { success: false, message: 'Invalid image data provided.', user: null };
+  }
+
+  try {
+    const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+    const usersData = objectToMap(usersObject);
+
+    let userEmail: string | undefined;
+    let userToUpdate: UserProfile | undefined;
+
+    // Find user by ID
+    for (const [email, profile] of usersData.entries()) {
+      if (profile.id === userId) {
+        userEmail = email;
+        userToUpdate = profile;
+        break;
+      }
+    }
+
+    if (!userToUpdate || !userEmail) {
+      console.log('Server Action: Update profile picture failed, user not found:', userId);
+      return { success: false, message: 'User not found.', user: null };
+    }
+
+    // Update the profile picture URL
+    userToUpdate.profilePictureUrl = imageDataUri;
+
+    // Update map and save
+    const updatedUsersMap = usersData.set(userEmail, userToUpdate);
+    await writeData(USERS_FILE, mapToObject(updatedUsersMap));
+
+    console.log('Server Action: Profile picture update successful for:', userId);
+    // Return the updated user object
+    const { ...userToReturn } = userToUpdate;
+    return { success: true, message: 'Profile picture updated successfully.', user: userToReturn };
+
+  } catch (error: any) {
+    console.error("Server Action: Profile picture update error -", error);
+    return { success: false, message: 'Server error during profile picture update.', user: null };
+  }
 }

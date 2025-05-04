@@ -15,7 +15,7 @@ import type { VolunteerStats } from '@/services/gamification';
 // Services are generally called via Server Actions now
 
 // Import server actions that will handle data persistence
-import { signInUser, signUpUser, updateUserRole, getRefreshedUserAction } from '@/actions/auth-actions'; // Added getRefreshedUserAction
+import { signInUser, signUpUser, updateUserRole, getRefreshedUserAction, updateUserProfilePictureAction } from '@/actions/auth-actions'; // Added getRefreshedUserAction, updateUserProfilePictureAction
 import { acceptVolunteerApplication, rejectVolunteerApplication, submitVolunteerApplicationAction } from '@/actions/application-actions'; // Added reject action
 import { addPointsAction, awardBadgeAction } from '@/actions/gamification-actions';
 import { getUserConversationsAction, startConversationAction } from '@/actions/messaging-actions'; // Added startConversationAction
@@ -29,6 +29,7 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   stats?: VolunteerStats; // Keep stats in profile for context access
+  profilePictureUrl?: string; // Optional URL for profile picture (Data URI for now)
 }
 
 interface AuthContextType {
@@ -39,6 +40,7 @@ interface AuthContextType {
   signUp: (email: string, pass: string, name: string, role: UserRole) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
   setRoleAndUpdateUser: (role: UserRole) => Promise<{ success: boolean; message: string }>;
+  updateProfilePicture: (imageDataUri: string) => Promise<{ success: boolean; message: string; user?: UserProfile | null }>; // Added profile pic update
   // Application Actions
   submitApplication: (application: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>) => Promise<{ success: boolean; message: string }>;
   acceptApplication: (applicationId: string, volunteerId: string) => Promise<{ success: boolean; message: string; conversationId?: string }>;
@@ -207,6 +209,32 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return { success: false, message: error.message || 'Failed to update role.'};
      } finally {
         setLoading(false);
+     }
+   }, [user]);
+
+   // Method to update profile picture
+   const updateProfilePicture = useCallback(async (imageDataUri: string): Promise<{ success: boolean; message: string; user?: UserProfile | null }> => {
+     if (!user) {
+       console.error("Cannot update profile picture: No user logged in.");
+       return { success: false, message: 'User not logged in.' };
+     }
+     setLoading(true);
+     try {
+       const result = await updateUserProfilePictureAction(user.id, imageDataUri);
+       if (result.success && result.user) {
+         setUser(result.user); // Update user state with the new picture URL
+         sessionStorage.setItem('loggedInUser', JSON.stringify(result.user)); // Update session storage
+         console.log(`Profile picture updated for user ${user.email} via server action.`);
+         return { success: true, message: result.message, user: result.user };
+       } else {
+         console.error('Failed to update profile picture via server action:', result.message);
+         return { success: false, message: result.message || 'Failed to update profile picture.' };
+       }
+     } catch (error: any) {
+       console.error('Failed to update profile picture:', error);
+       return { success: false, message: error.message || 'Failed to update profile picture.' };
+     } finally {
+       setLoading(false);
      }
    }, [user]);
 
@@ -402,6 +430,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         signUp,
         signOut,
         setRoleAndUpdateUser,
+        updateProfilePicture, // Add update profile picture function
         submitApplication,
         acceptApplication,
         rejectApplication, // Add rejectApplication to context value
@@ -422,4 +451,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

@@ -21,10 +21,22 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createOpportunityAction } from '@/actions/job-board-actions';
 import { opportunityCategories } from '@/config/constants'; // Import categories
+
+// Helper function to convert File to Base64 Data URI
+const fileToDataUri = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result as string);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
 // Validation schema
 const formSchema = z.object({
@@ -36,6 +48,20 @@ const formSchema = z.object({
     message: 'Please select a valid category.',
   }),
   pointsAwarded: z.coerce.number().min(0, 'Points must be 0 or greater.').optional(), // Optional number, coerce turns string input to number
+  image: z
+    .custom<FileList>() // Accept FileList from input
+    .optional()
+    .refine(
+      (fileList) => !fileList || fileList.length === 0 || fileList[0].size <= 2 * 1024 * 1024, // 2MB size limit for image
+      `Max image size is 2MB.`
+    )
+    .refine(
+      (fileList) =>
+        !fileList ||
+        fileList.length === 0 ||
+        ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(fileList[0].type),
+      "Only JPG, PNG, WEBP, GIF formats are supported."
+    ),
 });
 
 type OpportunityFormValues = z.infer<typeof formSchema>;
@@ -55,6 +81,7 @@ export function OpportunityCreationForm() {
       commitment: '',
       category: '',
       pointsAwarded: 0,
+      image: undefined,
     },
   });
 
@@ -65,13 +92,35 @@ export function OpportunityCreationForm() {
     }
     setIsSubmitting(true);
 
+    let imageUrlDataUri = '';
+    const imageFile = values.image?.[0];
+
+    if (imageFile) {
+      try {
+        imageUrlDataUri = await fileToDataUri(imageFile);
+      } catch (error) {
+        console.error('Error converting image file to Data URI:', error);
+        toast({
+          title: 'Image Processing Error',
+          description: 'Could not process the image file. Please try again.',
+          variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+
     try {
+      // Prepare data for the action, removing the FileList and adding the Data URI
+      const { image, ...restOfValues } = values;
       const result = await createOpportunityAction(
         {
-          ...values,
+          ...restOfValues,
           organization: user.displayName, // Set from context
           organizationId: user.id, // Set from context
           pointsAwarded: values.pointsAwarded ?? 0, // Ensure pointsAwarded is a number
+          imageUrl: imageUrlDataUri || undefined, // Pass the Data URI or undefined
         },
         user.id,
         user.displayName
@@ -201,6 +250,35 @@ export function OpportunityCreationForm() {
                <FormMessage />
              </FormItem>
            )}
+         />
+
+         {/* Image Upload (Optional) */}
+         <FormField
+           control={form.control}
+           name="image"
+           render={({ field: { onChange, value, ...fieldProps } }) => {
+             const currentFile = value?.[0];
+             return (
+               <FormItem>
+                 <FormLabel>Opportunity Image (Optional)</FormLabel>
+                 <FormControl>
+                   <div className="relative">
+                      <Input
+                        {...fieldProps}
+                        type="file"
+                        accept="image/jpeg, image/png, image/webp, image/gif"
+                        {...form.register("image")}
+                        className="block w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer bg-background"
+                      />
+                      {currentFile && <span className="text-sm text-muted-foreground mt-1 block">{currentFile.name}</span>}
+                      <Upload className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+                   </div>
+                 </FormControl>
+                 <FormDescription>Upload an image related to the opportunity (JPG, PNG, WEBP, GIF, max 2MB).</FormDescription>
+                 <FormMessage />
+               </FormItem>
+             );
+           }}
          />
 
 

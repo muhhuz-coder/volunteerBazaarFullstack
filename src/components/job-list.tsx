@@ -4,10 +4,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation'; // Import useRouter for navigation
+import Image from 'next/image'; // Import next/image
 import type { Opportunity } from '@/services/job-board';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2 } from 'lucide-react'; // Added MessageSquare, Loader2
+import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, ImageOff } from 'lucide-react'; // Added MessageSquare, Loader2, ImageOff
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext'; // Import useAuth
 import { useToast } from '@/hooks/use-toast'; // Import useToast
@@ -83,12 +84,27 @@ export function OpportunityList({ initialOpportunities, keywords = '', category 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
       {opportunities.map((opportunity) => (
-        <Card key={opportunity.id} className="flex flex-col justify-between shadow-md hover:shadow-xl border group transform transition duration-300 ease-in-out hover:scale-[1.02]">
-          <CardHeader className="pb-3">
+        <Card key={opportunity.id} className="flex flex-col justify-between shadow-md hover:shadow-xl border group transform transition duration-300 ease-in-out hover:scale-[1.02] overflow-hidden"> {/* Added overflow-hidden */}
+          {opportunity.imageUrl && opportunity.imageUrl.startsWith('data:image') ? (
+             <div className="relative h-40 w-full"> {/* Fixed height container for image */}
+                <Image
+                  src={opportunity.imageUrl}
+                  alt={opportunity.title || 'Opportunity image'}
+                  layout="fill"
+                  objectFit="cover" // Cover the container
+                  className="transition-transform duration-300 group-hover:scale-105" // Zoom effect on hover
+                />
+             </div>
+           ) : (
+              <div className="h-40 w-full bg-muted flex items-center justify-center">
+                 <ImageOff className="h-10 w-10 text-muted-foreground" />
+              </div>
+           )}
+          <CardHeader className="pb-3 pt-4"> {/* Adjusted padding */}
             <CardTitle className="text-xl font-semibold text-primary group-hover:text-accent transition-colors duration-200">{opportunity.title}</CardTitle>
             <CardDescription className="text-muted-foreground pt-1">{opportunity.organization}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm flex-grow">
+          <CardContent className="space-y-3 text-sm flex-grow px-6"> {/* Ensure padding */}
             <div className="flex items-center gap-2 text-muted-foreground">
               <MapPin className="h-4 w-4 flex-shrink-0" />
               <span>{opportunity.location}</span>
@@ -103,7 +119,7 @@ export function OpportunityList({ initialOpportunities, keywords = '', category 
             </div>
             <p className="text-foreground line-clamp-3 pt-3 leading-relaxed">{opportunity.description}</p>
           </CardContent>
-          <CardFooter className="pt-4 flex flex-wrap gap-2 justify-between items-center"> {/* Use flex-wrap and justify-between */}
+          <CardFooter className="pt-4 pb-6 px-6 flex flex-wrap gap-2 justify-between items-center"> {/* Use flex-wrap and justify-between, added padding */}
             {/* Apply Button */}
             <Button asChild variant="link" className="text-accent p-0 h-auto font-medium group-hover:underline">
               <Link href={`/apply/${opportunity.id}`} className="flex items-center gap-1">
@@ -117,8 +133,9 @@ export function OpportunityList({ initialOpportunities, keywords = '', category 
                  <AlertDialogTrigger asChild>
                    <Button
                      variant="outline"
-                     size="sm"
+                     size="icon"
                      disabled={contactingOrgId === opportunity.id}
+                     title="Contact Organization" // Add title for tooltip/accessibility
                    >
                      {contactingOrgId === opportunity.id ? (
                        <Loader2 className="h-4 w-4 animate-spin" />
@@ -129,7 +146,6 @@ export function OpportunityList({ initialOpportunities, keywords = '', category 
                  </AlertDialogTrigger>
                  <AlertDialogContent>
                    <AlertDialogHeader>
-                      {/* Add a DialogTitle for accessibility */}
                      <AlertDialogTitle>Contact {opportunity.organization}</AlertDialogTitle>
                      <AlertDialogDescription>
                        Send a message regarding the "{opportunity.title}" opportunity.
@@ -166,20 +182,32 @@ function OpportunityListSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
       {[...Array(6)].map((_, i) => (
-        <Card key={i} className="flex flex-col justify-between shadow-md border">
-           <CardHeader>
+        <Card key={i} className="flex flex-col justify-between shadow-md border overflow-hidden"> {/* Added overflow-hidden */}
+           <Skeleton className="h-40 w-full" /> {/* Skeleton for image */}
+           <CardHeader className="pb-3 pt-4">
              <Skeleton className="h-6 w-3/4 mb-2" />
              <Skeleton className="h-4 w-1/2" />
            </CardHeader>
-           <CardContent className="space-y-3">
-              <Skeleton className="h-4 w-1/3" />
-              <Skeleton className="h-4 w-1/3" />
-              <Skeleton className="h-4 w-1/4" />
-              <Skeleton className="h-4 w-full mt-2" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-2/3" />
+           <CardContent className="space-y-3 text-sm flex-grow px-6"> {/* Ensure padding */}
+              <div className="flex items-center gap-2">
+                 <Skeleton className="h-4 w-4 rounded-full" />
+                 <Skeleton className="h-4 w-1/3" />
+              </div>
+               <div className="flex items-center gap-2">
+                 <Skeleton className="h-4 w-4 rounded-full" />
+                 <Skeleton className="h-4 w-1/3" />
+               </div>
+              <div className="flex items-center gap-2">
+                 <Skeleton className="h-4 w-4 rounded-full" />
+                 <Skeleton className="h-4 w-1/4" />
+              </div>
+              <div className="pt-3">
+                 <Skeleton className="h-4 w-full mb-2" />
+                 <Skeleton className="h-4 w-full mb-2" />
+                 <Skeleton className="h-4 w-2/3" />
+               </div>
            </CardContent>
-           <CardFooter className="flex justify-between"> {/* Match layout */}
+           <CardFooter className="pt-4 pb-6 px-6 flex justify-between items-center"> {/* Match layout */}
              <Skeleton className="h-5 w-32" />
              <Skeleton className="h-8 w-8 rounded-md" /> {/* Skeleton for contact button */}
            </CardFooter>
@@ -188,5 +216,3 @@ function OpportunityListSkeleton() {
     </div>
   );
 }
-
-    

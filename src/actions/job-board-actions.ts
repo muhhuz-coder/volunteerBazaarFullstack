@@ -85,11 +85,17 @@ export async function createOpportunityAction(
         if (!opportunityData.title || !opportunityData.description || !opportunityData.location || !opportunityData.commitment || !opportunityData.category) {
             return { success: false, message: 'Missing required opportunity details.', opportunity: null };
         }
+        // Validate imageUrl if present (must be data URI)
+        if (opportunityData.imageUrl && !opportunityData.imageUrl.startsWith('data:image')) {
+             return { success: false, message: 'Invalid image format provided.', opportunity: null };
+        }
+
 
         const newOpportunity = await createOpportunityService({
             ...opportunityData,
             organizationId: organizationId, // Ensure the correct org ID is set
             organization: organizationName // Ensure the correct org name is set
+            // imageUrl is already included in opportunityData if provided
         });
         return { success: true, message: 'Opportunity created successfully.', opportunity: newOpportunity };
     } catch (error: any) {

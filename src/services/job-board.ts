@@ -1,3 +1,4 @@
+
 'use server';
 // src/services/job-board.ts
 import { readData, writeData } from '@/lib/db-utils';
@@ -15,6 +16,7 @@ export interface Opportunity {
   commitment: string;
   category: string;
   pointsAwarded?: number; // Optional points awarded upon completion/acceptance
+  imageUrl?: string; // Optional image for the opportunity (Data URI)
 }
 
 /**
@@ -27,7 +29,7 @@ export interface VolunteerApplication {
   volunteerId: string;
   applicantName: string;
   applicantEmail: string;
-  resumeUrl: string;
+  resumeUrl: string; // Stores Data URI of attachment
   coverLetter: string;
   status: 'submitted' | 'accepted' | 'rejected' | 'withdrawn';
   submittedAt: Date | string; // Allow string during read, convert to Date
@@ -223,6 +225,7 @@ export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>
       id: newId,
       // Ensure pointsAwarded is a number, default to 0 if undefined or invalid
       pointsAwarded: typeof opportunityData.pointsAwarded === 'number' && opportunityData.pointsAwarded >= 0 ? opportunityData.pointsAwarded : 0,
+      imageUrl: opportunityData.imageUrl || undefined, // Keep image URL if provided
     };
 
     opportunitiesData.push(newOpportunity);
