@@ -5,10 +5,6 @@ import { Toaster } from '@/components/ui/toaster'; // Import Toaster
 import { AuthProvider } from '@/context/AuthContext'; // Import AuthProvider
 
 // No need for Inter anymore if GeistSans is primary
-// const inter = Inter({
-//   subsets: ['latin'],
-//   variable: '--font-inter', // Changed variable name
-// });
 
 export const metadata: Metadata = {
   // Updated title and description

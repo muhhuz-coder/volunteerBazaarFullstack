@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'; // Import Button
 // Import server actions
 import { getApplicationsForVolunteerAction } from '@/actions/job-board-actions';
 import { getLeaderboardAction } from '@/actions/gamification-actions'; // Assuming this action exists
+import { cn } from '@/lib/utils'; // Import cn
 
 
 export default function VolunteerDashboard() {
@@ -117,7 +118,7 @@ export default function VolunteerDashboard() {
            <p className="text-muted-foreground">Verifying access or redirecting...</p>
          </div>
           <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-             <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+             <p>&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
           </footer>
        </div>
      );
@@ -140,7 +141,7 @@ export default function VolunteerDashboard() {
         {/* Gamification & Summary Row */}
          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
            {/* Points & Progress */}
-           <Card className="shadow-md border">
+           <Card className={cn("border", "card-hover-effect")}>
               <CardHeader>
                  <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-yellow-500" /> Your Points</CardTitle>
                  <CardDescription>Earn points by participating!</CardDescription>
@@ -153,7 +154,7 @@ export default function VolunteerDashboard() {
            </Card>
 
            {/* Badges */}
-           <Card className="shadow-md border">
+           <Card className={cn("border", "card-hover-effect")}>
               <CardHeader>
                  <CardTitle className="flex items-center gap-2"><Medal className="h-5 w-5 text-orange-500" /> Earned Badges</CardTitle>
                  <CardDescription>Achievements unlocked.</CardDescription>
@@ -172,14 +173,15 @@ export default function VolunteerDashboard() {
            </Card>
 
            {/* Profile Settings */}
-           <Card className="shadow-md border">
+           <Card className={cn("border", "card-hover-effect")}>
              <CardHeader>
                <CardTitle className="flex items-center gap-2"><UserCog className="h-5 w-5" />Profile Settings</CardTitle>
                <CardDescription>Update your profile and skills.</CardDescription>
              </CardHeader>
              <CardContent>
-               <p>Keep your information up-to-date.</p>
-               {/* TODO: Link to profile page */}
+               <Button asChild variant="outline" size="sm">
+                   <Link href="/profile/edit">Edit Profile</Link>
+               </Button>
              </CardContent>
            </Card>
          </div>
@@ -260,7 +262,7 @@ export default function VolunteerDashboard() {
 
       </div>
        <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-          <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
        </footer>
     </div>
   );

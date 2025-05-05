@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 // Import server actions
 import { getOpportunitiesAction, getApplicationsForOrganizationAction } from '@/actions/job-board-actions';
 import { acceptVolunteerApplication, rejectVolunteerApplication } from '@/actions/application-actions';
+import { cn } from '@/lib/utils'; // Import cn
 
 
 export default function OrganizationDashboard() {
@@ -161,7 +162,7 @@ export default function OrganizationDashboard() {
            <p className="text-muted-foreground">Verifying access or redirecting...</p>
          </div>
           <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-             <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+             <p>&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
           </footer>
        </div>
      );
@@ -183,7 +184,7 @@ export default function OrganizationDashboard() {
           </Button>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8"> {/* Adjusted gap and margin */}
-           <Card className="shadow-md border hover:shadow-lg transition-shadow">
+           <Card className={cn("border", "card-hover-effect")}>
              <CardHeader className="pb-2">
                <CardTitle className="text-lg flex items-center gap-2"><Briefcase className="h-5 w-5 text-accent" /> Active Opportunities</CardTitle>
                <CardDescription>Manage your current volunteer postings.</CardDescription>
@@ -192,7 +193,7 @@ export default function OrganizationDashboard() {
                <p className="text-3xl font-bold text-primary">{opportunities.length}</p>
              </CardContent>
            </Card>
-           <Card className="shadow-md border hover:shadow-lg transition-shadow">
+           <Card className={cn("border", "card-hover-effect")}>
              <CardHeader className="pb-2">
                <CardTitle className="text-lg flex items-center gap-2"><FileText className="h-5 w-5 text-accent" /> Total Applications</CardTitle>
                 <CardDescription>Overview of all received applications.</CardDescription>
@@ -201,7 +202,7 @@ export default function OrganizationDashboard() {
                 <p className="text-3xl font-bold text-primary">{applications.length}</p>
              </CardContent>
            </Card>
-            <Card className="shadow-md border hover:shadow-lg transition-shadow">
+            <Card className={cn("border", "card-hover-effect")}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2"><Settings className="h-5 w-5 text-accent" /> Organization Profile</CardTitle>
                  <CardDescription>Update your organization's information.</CardDescription>
@@ -320,7 +321,7 @@ export default function OrganizationDashboard() {
 
       </div>
        <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-          <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
        </footer>
     </div>
   );

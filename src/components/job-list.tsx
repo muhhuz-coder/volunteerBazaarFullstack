@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"; // Import AlertDialog components
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"; // Import VisuallyHidden
+import { cn } from '@/lib/utils'; // Import cn for conditional classes
 
 interface OpportunityListProps {
   initialOpportunities: Opportunity[];
@@ -84,7 +85,10 @@ export function OpportunityList({ initialOpportunities, keywords = '', category 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
       {opportunities.map((opportunity) => (
-        <Card key={opportunity.id} className="flex flex-col justify-between shadow-md hover:shadow-xl border group transform transition duration-300 ease-in-out hover:scale-[1.02] overflow-hidden"> {/* Added overflow-hidden */}
+        <Card key={opportunity.id} className={cn(
+           "flex flex-col justify-between border group overflow-hidden", // Base card styles
+           "card-hover-effect" // Apply hover animation class
+           )}>
           {opportunity.imageUrl && opportunity.imageUrl.startsWith('data:image') ? (
              <div className="relative h-40 w-full"> {/* Fixed height container for image */}
                 <Image

@@ -5,13 +5,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getAppStatisticsAction, type AppStats } from '@/actions/analytics-actions';
 import { Users, Building2, Briefcase } from 'lucide-react'; // Import icons
 import { Suspense } from 'react';
+import { cn } from '@/lib/utils'; // Import cn
 
 async function StatsDisplay() {
   const stats = await getAppStatisticsAction();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Card className="shadow-lg border hover:shadow-xl transition-shadow duration-300 ease-in-out">
+      <Card className={cn("border", "card-hover-effect")}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Volunteers</CardTitle>
           <Users className="h-5 w-5 text-accent" />
@@ -21,7 +22,7 @@ async function StatsDisplay() {
           <p className="text-xs text-muted-foreground">Individuals ready to help</p>
         </CardContent>
       </Card>
-      <Card className="shadow-lg border hover:shadow-xl transition-shadow duration-300 ease-in-out">
+      <Card className={cn("border", "card-hover-effect")}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Organizations</CardTitle>
           <Building2 className="h-5 w-5 text-accent" />
@@ -31,7 +32,7 @@ async function StatsDisplay() {
           <p className="text-xs text-muted-foreground">Groups making an impact</p>
         </CardContent>
       </Card>
-      <Card className="shadow-lg border hover:shadow-xl transition-shadow duration-300 ease-in-out">
+      <Card className={cn("border", "card-hover-effect")}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Opportunities</CardTitle>
           <Briefcase className="h-5 w-5 text-accent" />
@@ -73,7 +74,7 @@ export default function AnalyticsPage() {
         <Card className="w-full max-w-4xl mx-auto shadow-xl border mb-12">
            <CardHeader className="text-center pt-8 pb-4">
              <CardTitle className="text-3xl font-bold text-primary mb-2">Platform Analytics</CardTitle>
-             <CardDescription className="text-lg text-muted-foreground">Overview of Volunteer Connect's impact.</CardDescription>
+             <CardDescription className="text-lg text-muted-foreground">Overview of VolunteerBazaar's impact.</CardDescription>
            </CardHeader>
            <CardContent className="px-6 md:px-8 pb-10">
              <Suspense fallback={<StatsSkeleton />}>
@@ -90,7 +91,7 @@ export default function AnalyticsPage() {
         </Card>
       </div>
       <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-         <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+         <p>&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
       </footer>
     </div>
   );
