@@ -4,8 +4,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-// Updated icons and added Bell for Notifications
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search } from 'lucide-react'; // Added Briefcase, Search
+// Updated icons and added Bell for Notifications, MessageCircle for Chatbot
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, MessageCircle } from 'lucide-react'; // Added MessageCircle
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,19 +46,20 @@ export function Header() {
                       : role === 'volunteer' ? '/dashboard/volunteer'
                       : '/select-role';
 
-   // Add icons to base links
+   // Add icons to base links, including Chatbot
    const baseNavLinks = [
      { href: "/", label: "Opportunities", icon: Search },
      { href: "/about", label: "About Us", icon: Info },
      { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
      { href: "/contact", label: "Contact", icon: Mail },
      { href: "/analytics", label: "Analytics", icon: BarChart3 },
+     { href: "/chatbot", label: "Chatbot", icon: MessageCircle }, // Added Chatbot link
    ];
 
    // Ensure user-specific links also have icons if needed
    const navLinks = user
      ? [
-         ...baseNavLinks.filter(link => link.href !== '/analytics' && link.href !== '/contact'), // Keep Opportunities, About, How It Works
+         ...baseNavLinks.filter(link => link.href !== '/analytics' && link.href !== '/contact'), // Keep Opportunities, About, How It Works, Chatbot
          { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
          { href: "/contact", label: "Contact", icon: Mail }, // Add contact back for logged in users
          { href: "/analytics", label: "Analytics", icon: BarChart3 },
@@ -73,7 +74,7 @@ export function Header() {
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2 text-xl md:text-2xl font-bold">
           <AppIcon className="h-6 w-6 md:h-7 md:w-7" />
-          <span>Volunteer Connect</span>
+          <span>VolunteerBazaar</span>
         </Link>
 
         {/* Desktop Navigation */}

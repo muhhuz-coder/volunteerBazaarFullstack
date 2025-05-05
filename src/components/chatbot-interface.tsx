@@ -1,0 +1,157 @@
+
+'use client';
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Send, Loader2, Bot, User } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { ChatMessage } from '@/ai/flows/chatbot-flow'; // Import the message type
+import { sendMessageToChatbotAction } from '@/actions/chatbot-actions'; // Import the server action
+import { useToast } from '@/hooks/use-toast';
+
+export function ChatbotInterface() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Function to scroll to the bottom of the chat
+  const scrollToBottom = useCallback(() => {
+    const scrollArea = scrollAreaRef.current;
+    if (scrollArea) {
+      // Use requestAnimationFrame for smoother scrolling after render
+      requestAnimationFrame(() => {
+         const scrollableViewport = scrollArea.querySelector('div'); // Adjust selector if needed
+         if (scrollableViewport) {
+            scrollableViewport.scrollTop = scrollableViewport.scrollHeight;
+         }
+      });
+    }
+  }, []);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: ChatMessage = { role: 'user', text: input.trim() };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const result = await sendMessageToChatbotAction({
+        message: userMessage.text,
+        history: messages, // Send current history
+      });
+
+      if (result.success && result.reply) {
+        const botMessage: ChatMessage = { role: 'model', text: result.reply };
+        setMessages((prev) => [...prev, botMessage]);
+      } else {
+        throw new Error(result.error || 'Failed to get response.');
+      }
+    } catch (error: any) {
+      console.error('Chatbot error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Could not connect to the chatbot.',
+        variant: 'destructive',
+      });
+       // Add an error message to the chat
+        setMessages((prev) => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please try again." }]);
+    } finally {
+      setIsLoading(false);
+       // Ensure scroll happens after state update and potential error message
+      scrollToBottom();
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-card border rounded-lg shadow-lg overflow-hidden">
+      {/* Chat Messages Area */}
+      <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
+        <div className="space-y-4">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={cn(
+                'flex items-end gap-3',
+                message.role === 'user' ? 'justify-end' : 'justify-start'
+              )}
+            >
+              {message.role === 'model' && (
+                <Avatar className="h-8 w-8 border border-primary/20">
+                  {/* Add a simple bot image or fallback */}
+                  {/* <AvatarImage src="/bot-avatar.png" alt="Bot" /> */}
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    <Bot size={18} />
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <div
+                className={cn(
+                  'max-w-[75%] rounded-lg p-3 text-sm shadow-sm',
+                  message.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-foreground'
+                )}
+              >
+                {/* Improve text rendering for newlines */}
+                {message.text.split('\n').map((line, i) => (
+                    <p key={i}>{line || <>&nbsp;</>}</p> // Use non-breaking space for empty lines
+                ))}
+              </div>
+              {message.role === 'user' && (
+                <Avatar className="h-8 w-8 border border-muted-foreground/20">
+                   {/* Placeholder for user avatar - maybe initials? */}
+                  <AvatarFallback className="bg-muted/50 text-muted-foreground">
+                     <User size={18}/>
+                  </AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex items-end gap-3 justify-start">
+               <Avatar className="h-8 w-8 border border-primary/20">
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    <Bot size={18} />
+                  </AvatarFallback>
+                </Avatar>
+              <div className="max-w-[75%] rounded-lg p-3 text-sm shadow-sm bg-muted text-foreground">
+                 <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Input Area */}
+      <div className="border-t p-4 bg-background/80">
+        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+          <Input
+            type="text"
+            placeholder="Ask VolunteerBazaar Bot..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isLoading}
+            className="flex-grow"
+          />
+          <Button type="submit" size="icon" disabled={isLoading || !input.trim()} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            <span className="sr-only">Send message</span>
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
