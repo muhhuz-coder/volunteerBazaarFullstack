@@ -21,9 +21,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"; // Import AlertDialog components
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"; // Import VisuallyHidden
 
 interface OpportunityListProps {
   initialOpportunities: Opportunity[];
@@ -146,7 +146,11 @@ export function OpportunityList({ initialOpportunities, keywords = '', category 
                  </AlertDialogTrigger>
                  <AlertDialogContent>
                    <AlertDialogHeader>
-                     <AlertDialogTitle>Contact {opportunity.organization}</AlertDialogTitle>
+                     {/* Add VisuallyHidden DialogTitle for accessibility */}
+                     <AlertDialogTitle>
+                        <VisuallyHidden>Contact Organization</VisuallyHidden>
+                        Contact {opportunity.organization}
+                     </AlertDialogTitle>
                      <AlertDialogDescription>
                        Send a message regarding the "{opportunity.title}" opportunity.
                      </AlertDialogDescription>

@@ -95,11 +95,21 @@ body {
   }
    /* Add focus-visible styles globally for accessibility */
   *:focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+    @apply outline-none ring-2 ring-ring/70 ring-offset-2 ring-offset-background; /* Adjusted opacity */
   }
 }
 
-/* Optional: Add subtle background gradient */
-body {
-  /* background-image: linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--secondary))); */
+/* Simple fade-in animation for page content */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
+
+.page-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Optional: Add subtle background gradient */
+/* body { */
+  /* background-image: linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--secondary))); */
+/* } */

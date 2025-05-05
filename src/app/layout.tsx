@@ -12,7 +12,7 @@ import { AuthProvider } from '@/context/AuthContext'; // Import AuthProvider
 
 export const metadata: Metadata = {
   // Updated title and description
-  title: 'Volunteer Connect',
+  title: 'VolunteerBazaar',
   description: 'Find volunteer opportunities or recruit volunteers.',
 };
 
@@ -27,7 +27,8 @@ export default function RootLayout({
       {/* Body will inherit the font family from globals.css */}
       <body className={`antialiased`}>
         <AuthProvider> {/* Wrap children with AuthProvider */}
-          <main className="min-h-screen flex flex-col">
+          {/* Apply fade-in animation to main content area */}
+          <main className="min-h-screen flex flex-col page-fade-in">
             {children}
           </main>
           <Toaster /> {/* Add Toaster component */}
