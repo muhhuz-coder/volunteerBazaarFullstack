@@ -103,5 +103,3 @@ export async function getPublicVolunteers(filters?: {
         : { points: 0, badges: [], hours: 0 }
   }));
 }
-
-```
