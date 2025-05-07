@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { notFound } from 'next/navigation';
 import MapDisplay from '@/components/map-display'; // Import the MapDisplay component
 import { Separator } from '@/components/ui/separator'; // Import Separator
-import { MapPin, Clock, Activity } from 'lucide-react'; // Import icons
+import { MapPin, Clock, Activity, CalendarClock } from 'lucide-react'; // Import icons
+import { format } from 'date-fns';
 
 export default async function ApplyPage({ params }: { params: { opportunityId: string } }) {
   const { opportunityId } = params;
@@ -27,7 +28,7 @@ export default async function ApplyPage({ params }: { params: { opportunityId: s
             <CardTitle className="text-2xl font-bold text-primary">{opportunity.title}</CardTitle>
             <CardDescription>Apply for the volunteer role at {opportunity.organization}.</CardDescription>
              {/* Add key details */}
-             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2">
+             <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground pt-2">
                 <div className="flex items-center gap-1.5">
                   <MapPin className="h-4 w-4" />
                   <span>{opportunity.location}</span>
@@ -40,6 +41,12 @@ export default async function ApplyPage({ params }: { params: { opportunityId: s
                   <Clock className="h-4 w-4" />
                   <span>{opportunity.commitment}</span>
                 </div>
+                {opportunity.applicationDeadline && (
+                  <div className="flex items-center gap-1.5">
+                    <CalendarClock className="h-4 w-4" />
+                    <span>Apply by: {format(new Date(opportunity.applicationDeadline), 'PPP')}</span>
+                  </div>
+                )}
               </div>
           </CardHeader>
 
@@ -60,7 +67,7 @@ export default async function ApplyPage({ params }: { params: { opportunityId: s
         </Card>
       </div>
        <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-          <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
        </footer>
     </div>
   );

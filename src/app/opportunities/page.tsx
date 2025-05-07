@@ -1,3 +1,4 @@
+
 // src/app/opportunities/page.tsx
 import { Header } from '@/components/layout/header';
 import { OpportunitySearch } from '@/components/job-search';
@@ -5,7 +6,7 @@ import { OpportunityList } from '@/components/job-list';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getOpportunitiesAction } from '@/actions/job-board-actions';
-import { Briefcase, MapPin, Activity, Clock, Star } from 'lucide-react';
+import { Briefcase, MapPin, Activity, Clock, Star, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
@@ -35,6 +36,10 @@ function OpportunityListSkeleton({ view = 'grid' }: { view?: 'grid' | 'list' }) 
               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
               <Skeleton className="h-3 w-16 bg-muted-foreground/20" />
             </div>
+             <div className="flex items-center gap-1.5">
+              <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+              <Skeleton className="h-3 w-28 bg-muted-foreground/20" />
+            </div>
           </div>
           <Skeleton className="h-3 w-full mb-1 bg-muted-foreground/20" />
           <Skeleton className="h-3 w-5/6 bg-muted-foreground/20" />
@@ -56,6 +61,10 @@ function OpportunityListSkeleton({ view = 'grid' }: { view?: 'grid' | 'list' }) 
             <div className="text-xs">
                  <Skeleton className="h-3 w-24 mb-0.5 bg-muted-foreground/20" />
                  <Skeleton className="h-5 w-10 bg-muted-foreground/20" />
+            </div>
+             <div className="text-xs">
+                 <Skeleton className="h-3 w-16 mb-0.5 bg-muted-foreground/20" />
+                 <Skeleton className="h-5 w-20 bg-muted-foreground/20" />
             </div>
             <div className="flex items-center gap-0.5 mt-1">
                {[...Array(5)].map((_, i) => <Star key={i} className="h-3 w-3 text-muted-foreground/30" />)}
@@ -116,7 +125,7 @@ export default async function OpportunitiesPage({
   );
 
   const createTabLink = (tabValue: 'all' | 'active' | 'archived') => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams?.toString() || ''); // Handle undefined searchParams
     // Add existing parameters back, except for 'tab'
     if (keywords) params.set('keywords', keywords);
     if (category && category !== 'All') params.set('category', category);

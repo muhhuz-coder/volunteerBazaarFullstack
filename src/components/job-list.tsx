@@ -8,7 +8,7 @@ import Image from 'next/image';
 import type { Opportunity } from '@/services/job-board';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, Briefcase, LayoutGrid, List, Users, Handshake, Star, Eye } from 'lucide-react';
+import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, Briefcase, LayoutGrid, List, Users, Handshake, Star, Eye, CalendarClock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -21,13 +21,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
 
 
 interface OpportunityListProps {
@@ -44,6 +44,7 @@ const sortOptions = [
   { value: 'recent', label: 'Most Recent' },
   { value: 'title_asc', label: 'Title (A-Z)' },
   { value: 'title_desc', label: 'Title (Z-A)' },
+  { value: 'deadline_asc', label: 'Application Deadline' },
 ];
 
 export function OpportunityList({
@@ -184,6 +185,12 @@ export function OpportunityList({
             <Clock className="h-3.5 w-3.5 flex-shrink-0" />
             <span className="line-clamp-1">{opportunity.commitment}</span>
           </div>
+          {opportunity.applicationDeadline && (
+            <div className="flex items-center gap-1.5 text-destructive/80">
+                <CalendarClock className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>Apply by: {format(new Date(opportunity.applicationDeadline), 'MMM d, yyyy')}</span>
+            </div>
+          )}
           <p className="text-foreground/90 line-clamp-2 pt-2 text-xs leading-relaxed">{opportunity.description}</p>
         </CardContent>
 
@@ -250,6 +257,14 @@ export function OpportunityList({
              <p className="font-medium text-muted-foreground">Category</p>
              <Badge variant="outline" className="mt-1 text-xs">{opportunity.category}</Badge>
           </div>
+           {opportunity.applicationDeadline && (
+             <div className="text-xs">
+                <p className="font-medium text-muted-foreground">Deadline</p>
+                <p className="text-sm font-semibold text-destructive/90 flex items-center gap-1">
+                    <CalendarClock className="h-4 w-4" /> {format(new Date(opportunity.applicationDeadline), 'PPP')}
+                </p>
+             </div>
+           )}
           <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
              {[...Array(5)].map((_,i) => <Star key={i} className={cn("h-3.5 w-3.5", i < Math.round((opportunity.pointsAwarded || 0) / 20) ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground/30")} />)}
              <span className="ml-1">({((opportunity.pointsAwarded || 0) / 20).toFixed(1)} rating)</span>
@@ -341,7 +356,7 @@ export function OpportunityList({
       </div>
 
       {currentView === 'grid' ? (
-        <div className="flex overflow-x-auto space-x-4 pb-4 scroll-smooth scroll-snap-x-mandatory">
+        <div className="flex overflow-x-auto space-x-4 pb-4 scroll-smooth scroll-snap-x-mandatory hide-scrollbar">
           {opportunities.map((opportunity) => (
             <OpportunityCard key={opportunity.id} opportunity={opportunity} />
           ))}
@@ -393,5 +408,3 @@ export function OpportunityList({
     </>
   );
 }
-
-    

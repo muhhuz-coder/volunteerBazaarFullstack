@@ -18,6 +18,7 @@ export interface Opportunity {
   pointsAwarded?: number; // Optional points awarded upon completion/acceptance
   imageUrl?: string; // Optional image for the opportunity (Data URI or URL)
   createdAt?: Date | string; // Optional: Timestamp for when opportunity was created for sorting
+  applicationDeadline?: Date | string; // Optional: Deadline for applications
 }
 
 /**
@@ -53,7 +54,8 @@ async function loadOpportunitiesData(): Promise<Opportunity[]> {
     const opportunities = await readData<Opportunity[]>(OPPORTUNITIES_FILE, []);
     return opportunities.map(opp => ({
         ...opp,
-        createdAt: opp.createdAt ? new Date(opp.createdAt) : new Date(0) // Default to epoch if not present
+        createdAt: opp.createdAt ? new Date(opp.createdAt) : new Date(0), // Default to epoch if not present
+        applicationDeadline: opp.applicationDeadline ? new Date(opp.applicationDeadline) : undefined,
     }));
 }
 
@@ -116,21 +118,31 @@ export async function getOpportunities(
   }
 
   // Apply tab-based filtering based on createdAt
+  // For "active" tab, now also consider if applicationDeadline exists and hasn't passed
   if (tab === 'active') {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const now = new Date();
     opportunitiesData = opportunitiesData.filter(opp => {
-      const createdAtDate = opp.createdAt instanceof Date ? opp.createdAt : new Date(opp.createdAt || 0);
-      return createdAtDate >= thirtyDaysAgo;
+        const createdAtDate = opp.createdAt instanceof Date ? opp.createdAt : new Date(opp.createdAt || 0);
+        const deadline = opp.applicationDeadline ? (opp.applicationDeadline instanceof Date ? opp.applicationDeadline : new Date(opp.applicationDeadline)) : null;
+        
+        const isRecent = createdAtDate >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // Created in last 30 days
+        const isDeadlineOpen = deadline ? deadline >= now : true; // If deadline exists, it must not have passed
+
+        return isRecent && isDeadlineOpen;
     });
   } else if (tab === 'archived') {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const now = new Date();
     opportunitiesData = opportunitiesData.filter(opp => {
       const createdAtDate = opp.createdAt instanceof Date ? opp.createdAt : new Date(opp.createdAt || 0);
-      return createdAtDate < thirtyDaysAgo;
+      const deadline = opp.applicationDeadline ? (opp.applicationDeadline instanceof Date ? opp.applicationDeadline : new Date(opp.applicationDeadline)) : null;
+      
+      const isOld = createdAtDate < new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // Older than 30 days
+      const isDeadlinePassed = deadline ? deadline < now : false; // If deadline exists, it has passed
+
+      return isOld || isDeadlinePassed; // Archived if old OR deadline passed
     });
   }
+
 
   // Sorting logic
   switch (sort) {
@@ -139,6 +151,13 @@ export async function getOpportunities(
       break;
     case 'title_desc':
       opportunitiesData.sort((a, b) => b.title.localeCompare(a.title));
+      break;
+    case 'deadline_asc': // New sort option
+      opportunitiesData.sort((a, b) => {
+        const deadlineA = a.applicationDeadline ? (a.applicationDeadline instanceof Date ? a.applicationDeadline : new Date(a.applicationDeadline)).getTime() : Infinity;
+        const deadlineB = b.applicationDeadline ? (b.applicationDeadline instanceof Date ? b.applicationDeadline : new Date(b.applicationDeadline)).getTime() : Infinity;
+        return deadlineA - deadlineB;
+      });
       break;
     case 'recent': // Default sort by createdAt descending (newest first)
     default:
@@ -284,6 +303,7 @@ export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>
       pointsAwarded: typeof opportunityData.pointsAwarded === 'number' && opportunityData.pointsAwarded >= 0 ? opportunityData.pointsAwarded : 0,
       imageUrl: opportunityData.imageUrl || undefined,
       createdAt: new Date(), // Add createdAt timestamp
+      applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : undefined,
     };
 
     opportunitiesData.push(newOpportunity);
@@ -301,8 +321,13 @@ export async function getOpportunityById(id: string): Promise<Opportunity | unde
     await sleep(50);
     const opportunitiesData = await loadOpportunitiesData();
     const opportunity = opportunitiesData.find(opp => opp.id === id);
-    if (opportunity && opportunity.createdAt) {
-      opportunity.createdAt = opportunity.createdAt instanceof Date ? opportunity.createdAt : new Date(opportunity.createdAt);
+    if (opportunity) {
+      if (opportunity.createdAt) {
+        opportunity.createdAt = opportunity.createdAt instanceof Date ? opportunity.createdAt : new Date(opportunity.createdAt);
+      }
+      if (opportunity.applicationDeadline) {
+        opportunity.applicationDeadline = opportunity.applicationDeadline instanceof Date ? opportunity.applicationDeadline : new Date(opportunity.applicationDeadline);
+      }
     }
     return opportunity ? { ...opportunity } : undefined;
 }

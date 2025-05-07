@@ -80,7 +80,7 @@ export async function getOpportunityByIdAction(id: string): Promise<Opportunity 
  * Server action to create a new volunteer opportunity.
  */
 export async function createOpportunityAction(
-    opportunityData: Omit<Opportunity, 'id'>,
+    opportunityData: Omit<Opportunity, 'id' | 'organizationId' | 'organization'>, // organizationId and name are passed separately
     organizationId: string,
     organizationName: string
 ): Promise<{ success: boolean; message: string; opportunity?: Opportunity | null }> {
@@ -95,8 +95,9 @@ export async function createOpportunityAction(
 
         const newOpportunity = await createOpportunityService({
             ...opportunityData,
-            organizationId: organizationId,
-            organization: organizationName
+            organizationId: organizationId, // Add organizationId
+            organization: organizationName, // Add organizationName
+            applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : undefined,
         });
         return { success: true, message: 'Opportunity created successfully.', opportunity: newOpportunity };
     } catch (error: any) {

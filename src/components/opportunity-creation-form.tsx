@@ -6,6 +6,8 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
 
 import { Button } from '@/components/ui/button';
 import {
@@ -20,11 +22,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createOpportunityAction } from '@/actions/job-board-actions';
 import { opportunityCategories } from '@/config/constants'; // Import categories
+import { cn } from '@/lib/utils';
 
 // Helper function to convert File to Base64 Data URI
 const fileToDataUri = (file: File): Promise<string> => {
@@ -47,12 +52,13 @@ const formSchema = z.object({
   category: z.string().refine(val => val !== 'All' && opportunityCategories.includes(val), {
     message: 'Please select a valid category.',
   }),
-  pointsAwarded: z.coerce.number().min(0, 'Points must be 0 or greater.').optional(), // Optional number, coerce turns string input to number
+  pointsAwarded: z.coerce.number().min(0, 'Points must be 0 or greater.').optional(),
+  applicationDeadline: z.date().optional(),
   image: z
-    .custom<FileList>() // Accept FileList from input
+    .custom<FileList>()
     .optional()
     .refine(
-      (fileList) => !fileList || fileList.length === 0 || fileList[0].size <= 2 * 1024 * 1024, // 2MB size limit for image
+      (fileList) => !fileList || fileList.length === 0 || fileList[0].size <= 2 * 1024 * 1024,
       `Max image size is 2MB.`
     )
     .refine(
@@ -81,6 +87,7 @@ export function OpportunityCreationForm() {
       commitment: '',
       category: '',
       pointsAwarded: 0,
+      applicationDeadline: undefined,
       image: undefined,
     },
   });
@@ -112,15 +119,15 @@ export function OpportunityCreationForm() {
 
 
     try {
-      // Prepare data for the action, removing the FileList and adding the Data URI
       const { image, ...restOfValues } = values;
       const result = await createOpportunityAction(
         {
           ...restOfValues,
-          organization: user.displayName, // Set from context
-          organizationId: user.id, // Set from context
-          pointsAwarded: values.pointsAwarded ?? 0, // Ensure pointsAwarded is a number
-          imageUrl: imageUrlDataUri || undefined, // Pass the Data URI or undefined
+          organization: user.displayName,
+          organizationId: user.id,
+          pointsAwarded: values.pointsAwarded ?? 0,
+          imageUrl: imageUrlDataUri || undefined,
+          applicationDeadline: values.applicationDeadline, // Pass the date object
         },
         user.id,
         user.displayName
@@ -129,9 +136,8 @@ export function OpportunityCreationForm() {
       if (result.success && result.opportunity) {
         toast({ title: 'Success', description: `Opportunity "${result.opportunity.title}" created.` });
         form.reset();
-        // Optionally redirect to the dashboard or the new opportunity page
         router.push('/dashboard/organization');
-        router.refresh(); // Refresh server components
+        router.refresh();
       } else {
         throw new Error(result.message || 'Failed to create opportunity.');
       }
@@ -224,7 +230,7 @@ export function OpportunityCreationForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {opportunityCategories.filter(cat => cat !== 'All').map((cat) => ( // Exclude 'All'
+                  {opportunityCategories.filter(cat => cat !== 'All').map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
                     </SelectItem>
@@ -236,6 +242,52 @@ export function OpportunityCreationForm() {
           )}
         />
 
+         {/* Application Deadline (Optional) */}
+         <FormField
+           control={form.control}
+           name="applicationDeadline"
+           render={({ field }) => (
+             <FormItem className="flex flex-col">
+               <FormLabel>Application Deadline (Optional)</FormLabel>
+               <Popover>
+                 <PopoverTrigger asChild>
+                   <FormControl>
+                     <Button
+                       variant={"outline"}
+                       className={cn(
+                         "w-full pl-3 text-left font-normal bg-background",
+                         !field.value && "text-muted-foreground"
+                       )}
+                     >
+                       {field.value ? (
+                         format(field.value, "PPP")
+                       ) : (
+                         <span>Pick a date</span>
+                       )}
+                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                     </Button>
+                   </FormControl>
+                 </PopoverTrigger>
+                 <PopoverContent className="w-auto p-0" align="start">
+                   <Calendar
+                     mode="single"
+                     selected={field.value}
+                     onSelect={field.onChange}
+                     disabled={(date) =>
+                       date < new Date(new Date().setDate(new Date().getDate() -1)) // Disable past dates
+                     }
+                     initialFocus
+                   />
+                 </PopoverContent>
+               </Popover>
+               <FormDescription>
+                 Last date for volunteers to apply for this opportunity.
+               </FormDescription>
+               <FormMessage />
+             </FormItem>
+           )}
+         />
+
          {/* Points Awarded (Optional) */}
          <FormField
            control={form.control}
@@ -244,7 +296,7 @@ export function OpportunityCreationForm() {
              <FormItem>
                <FormLabel>Points Awarded (Optional)</FormLabel>
                <FormControl>
-                 <Input type="number" placeholder="e.g., 50" {...field} className="bg-background" min="0" />
+                 <Input type="number" placeholder="e.g., 50" {...field} className="bg-background" min="0" value={field.value ?? 0} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} />
                </FormControl>
                <FormDescription>Points awarded to volunteers upon completion/acceptance.</FormDescription>
                <FormMessage />
