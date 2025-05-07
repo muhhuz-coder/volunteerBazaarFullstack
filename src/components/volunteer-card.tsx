@@ -26,7 +26,12 @@ export function VolunteerCard({ volunteer, view = 'grid' }: VolunteerCardProps) 
     return name.length > 0 ? name[0].toUpperCase() : 'V';
   };
 
-  const stats = volunteer.stats || { points: 0, badges: [], hours: 0 };
+  // Use nullish coalescing for each stat property for robustness
+  const displayStats = {
+    points: volunteer.stats?.points ?? 0,
+    badges: volunteer.stats?.badges ?? [],
+    hours: volunteer.stats?.hours ?? 0,
+  };
 
   return (
     <Card className={cn(
@@ -69,23 +74,23 @@ export function VolunteerCard({ volunteer, view = 'grid' }: VolunteerCardProps) 
         <CardContent className="p-0 space-y-2 text-xs md:text-sm flex-grow mt-2">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Star className="h-4 w-4 text-yellow-500 flex-shrink-0" />
-            <span>{stats.points} Points</span>
+            <span>{displayStats.points} Points</span>
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Award className="h-4 w-4 text-orange-500 flex-shrink-0" />
-            <span>{stats.badges.length} Badge{stats.badges.length !== 1 ? 's' : ''}</span>
+            <span>{displayStats.badges.length} Badge{displayStats.badges.length !== 1 ? 's' : ''}</span>
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
-            <span>{stats.hours} Hours Logged</span>
+            <span>{displayStats.hours} Hours Logged</span>
           </div>
            {/* Display a few badges if available */}
-           {stats.badges.length > 0 && view === 'grid' && (
+           {displayStats.badges.length > 0 && view === 'grid' && (
              <div className="pt-2 line-clamp-2">
-               {stats.badges.slice(0, 3).map((badge, index) => (
+               {displayStats.badges.slice(0, 3).map((badge, index) => (
                  <Badge key={index} variant="secondary" className="mr-1 mb-1 text-xs">{badge}</Badge>
                ))}
-               {stats.badges.length > 3 && <span className="text-xs text-muted-foreground">...</span>}
+               {displayStats.badges.length > 3 && <span className="text-xs text-muted-foreground">...</span>}
              </div>
            )}
         </CardContent>
@@ -107,14 +112,14 @@ export function VolunteerCard({ volunteer, view = 'grid' }: VolunteerCardProps) 
       
       {view === 'list' && (
         <div className="w-full md:w-1/4 p-4 border-l flex-shrink-0 flex flex-col justify-center items-start space-y-3 bg-card/50 md:bg-transparent">
-            {stats.badges.length > 0 && (
+            {displayStats.badges.length > 0 && (
                  <div className="text-xs">
                      <p className="font-medium text-muted-foreground mb-1">Top Badges</p>
                      <div className="flex flex-wrap gap-1">
-                        {stats.badges.slice(0, 2).map((badge, idx) => (
+                        {displayStats.badges.slice(0, 2).map((badge, idx) => (
                             <Badge key={idx} variant="outline" className="text-xs">{badge}</Badge>
                         ))}
-                        {stats.badges.length > 2 && <Badge variant="outline" className="text-xs">+{stats.badges.length-2} more</Badge>}
+                        {displayStats.badges.length > 2 && <Badge variant="outline" className="text-xs">+{displayStats.badges.length-2} more</Badge>}
                      </div>
                  </div>
             )}

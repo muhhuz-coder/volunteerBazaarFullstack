@@ -6,36 +6,30 @@ import type { UserProfile } from '@/context/AuthContext';
 import type { VolunteerStats } from '@/services/gamification'; // Import for stats typing
 
 const USERS_FILE = 'users.json';
-const USER_STATS_FILE = 'user-stats.json'; // Assuming stats might be separate or need merging
+// const USER_STATS_FILE = 'user-stats.json'; // User stats are part of UserProfile in users.json
 
 // Simulate API delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Loads all user profiles from the users.json file.
- * Ensures volunteer stats are merged if they are stored separately.
+ * Ensures volunteer stats are merged and defaulted if necessary.
  */
 async function getAllUsersWithStats(): Promise<UserProfile[]> {
     const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
     const usersMap = objectToMap(usersObject);
     
-    // If stats are stored separately and need to be merged:
-    // const userStatsObject = await readData<Record<string, VolunteerStats>>(USER_STATS_FILE, {});
-    // const userStatsMap = objectToMap(userStatsObject);
-
     const allUsers: UserProfile[] = [];
     for (const user of usersMap.values()) {
-        let userWithStats = { ...user };
-        // If stats are in users.json, user.stats should already be populated for volunteers.
-        // If stats were separate:
-        // if (user.role === 'volunteer' && userStatsMap.has(user.id)) {
-        //     userWithStats.stats = userStatsMap.get(user.id);
-        // } else if (user.role === 'volunteer' && !userWithStats.stats) {
-        //     userWithStats.stats = { points: 0, badges: [], hours: 0 }; // Default if not found
-        // }
-        // Ensure volunteers always have a stats object
-        if (user.role === 'volunteer' && !userWithStats.stats) {
-            userWithStats.stats = { points: 0, badges: [], hours: 0 };
+        let userWithStats = { ...user }; // Shallow copy of user
+
+        if (userWithStats.role === 'volunteer') {
+            const existingStats = userWithStats.stats || {}; // Handle undefined/null stats
+            userWithStats.stats = {
+                points: existingStats.points ?? 0,
+                badges: Array.isArray(existingStats.badges) ? [...existingStats.badges] : [], // Ensure badges is an array and copied
+                hours: existingStats.hours ?? 0,
+            };
         }
         allUsers.push(userWithStats);
     }
@@ -81,7 +75,7 @@ export async function getPublicVolunteers(filters?: {
         volunteers.sort((a, b) => b.displayName.localeCompare(a.displayName));
         break;
       default:
-        // Default sort (e.g., by points if no specific sort or by registration date if available)
+        // Default sort by points
         volunteers.sort((a, b) => (b.stats?.points ?? 0) - (a.stats?.points ?? 0));
         break;
     }
@@ -91,6 +85,12 @@ export async function getPublicVolunteers(filters?: {
   }
 
   console.log(`Returning ${volunteers.length} public volunteer profiles.`);
-  // Return copies of user profiles
-  return volunteers.map(v => ({ ...v, stats: v.stats ? {...v.stats, badges: [...(v.stats.badges || [])]} : undefined }));
+  // Return copies of user profiles with stats ensured to be copied as well
+  return volunteers.map(v => ({
+    ...v,
+    // Since getAllUsersWithStats ensures stats object and its fields are initialized for volunteers,
+    // we can confidently spread it. We also ensure badges array is a new copy.
+    stats: v.stats ? { ...v.stats, badges: [...v.stats.badges] } : { points: 0, badges: [], hours: 0 }
+  }));
 }
+
