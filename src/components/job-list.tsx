@@ -8,7 +8,7 @@ import Image from 'next/image';
 import type { Opportunity } from '@/services/job-board';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, ImageOff, Star, Eye, Briefcase, LayoutGrid, List, ShieldCheck, Users, Handshake } from 'lucide-react';
+import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, ImageOff, Star, Eye, Briefcase, LayoutGrid, List, Users, Handshake } from 'lucide-react'; // Added ShieldCheck, Users, Handshake
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger, // Added AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -60,6 +61,9 @@ export function OpportunityList({
 
   const [contactingOrgId, setContactingOrgId] = useState<string | null>(null);
   const [messageContent, setMessageContent] = useState('');
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [currentOpportunityForDialog, setCurrentOpportunityForDialog] = useState<Opportunity | null>(null);
+
 
   const handleViewChange = (view: 'grid' | 'list') => {
     const params = new URLSearchParams(searchParams.toString());
@@ -74,9 +78,20 @@ export function OpportunityList({
   };
 
 
-  const handleContactOrganization = async (opportunity: Opportunity) => {
-     if (!user || role !== 'volunteer') {
-       toast({ title: "Login Required", description: "Please log in as a volunteer to contact organizations.", variant: "destructive" });
+  const openContactDialog = (opportunity: Opportunity) => {
+    if (!user || role !== 'volunteer') {
+      toast({ title: "Login Required", description: "Please log in as a volunteer to contact organizations.", variant: "destructive" });
+      return;
+    }
+    setCurrentOpportunityForDialog(opportunity);
+    setMessageContent(''); // Reset message content
+    setShowContactDialog(true);
+  };
+
+
+  const handleContactOrganization = async () => {
+     if (!currentOpportunityForDialog || !user || role !== 'volunteer') {
+       toast({ title: "Error", description: "An unexpected error occurred or you are not authorized.", variant: "destructive" });
        return;
      }
       if (!messageContent.trim()) {
@@ -84,20 +99,21 @@ export function OpportunityList({
         return;
       }
 
-     setContactingOrgId(opportunity.id);
+     setContactingOrgId(currentOpportunityForDialog.id);
 
      try {
         const result = await startConversation({
-            organizationId: opportunity.organizationId,
-            organizationName: opportunity.organization,
-            opportunityId: opportunity.id,
-            opportunityTitle: opportunity.title,
+            organizationId: currentOpportunityForDialog.organizationId,
+            organizationName: currentOpportunityForDialog.organization,
+            opportunityId: currentOpportunityForDialog.id,
+            opportunityTitle: currentOpportunityForDialog.title,
             initialMessage: messageContent,
         });
 
         if (result.success && result.conversation) {
             toast({ title: "Message Sent", description: "Your message has been sent to the organization." });
             setMessageContent('');
+            setShowContactDialog(false);
             router.push(`/dashboard/messages/${result.conversation.id}`);
         } else {
              throw new Error(result.error || "Failed to start conversation.");
@@ -111,20 +127,20 @@ export function OpportunityList({
   };
 
   if (opportunities.length === 0) {
-    return <div className="text-center text-muted-foreground mt-8 py-10 bg-card rounded-lg border">No opportunities found matching your criteria. Try adjusting your filters.</div>;
+    return <div className="text-center text-muted-foreground mt-8 py-10 bg-card rounded-lg border shadow-md">No opportunities found matching your criteria. Try adjusting your filters.</div>;
   }
 
   const OpportunityCard = ({ opportunity }: { opportunity: Opportunity }) => (
     <Card className={cn(
         "flex group overflow-hidden transition-all duration-300 ease-in-out border",
-        currentView === 'grid' ? 'flex-col card-hover-effect' : 'flex-row items-start hover:shadow-lg'
+        currentView === 'grid' ? 'flex-col card-hover-effect' : 'flex-row items-start hover:shadow-lg bg-card' // Ensure bg-card for list view too
     )}>
       {/* Image Section */}
       <div className={cn(
-          "relative bg-muted flex-shrink-0",
-          currentView === 'grid' ? 'h-48 w-full' : 'h-full w-1/3 md:w-1/4' // Adjust width for list view
+          "relative bg-muted/50 flex-shrink-0", // Slightly lighter muted for image placeholder
+          currentView === 'grid' ? 'h-48 w-full' : 'h-full w-1/3 md:w-1/4'
       )}>
-        {opportunity.imageUrl && opportunity.imageUrl.startsWith('data:image') ? (
+        {opportunity.imageUrl && (opportunity.imageUrl.startsWith('data:image') || opportunity.imageUrl.startsWith('http')) ? (
           <Image
             src={opportunity.imageUrl}
             alt={opportunity.title || 'Opportunity image'}
@@ -134,10 +150,15 @@ export function OpportunityList({
             data-ai-hint="community event charity work"
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center">
-            <Briefcase className="h-12 w-12 text-muted-foreground/50" />
+          <div className="h-full w-full flex items-center justify-center bg-secondary">
+            <Briefcase className="h-12 w-12 text-muted-foreground/40" />
           </div>
         )}
+         {opportunity.pointsAwarded && opportunity.pointsAwarded > 0 && (
+           <Badge variant="default" className="absolute top-2 right-2 bg-primary/80 backdrop-blur-sm text-primary-foreground shadow-md">
+             {opportunity.pointsAwarded} PTS
+           </Badge>
+         )}
       </div>
 
       {/* Main Content Section */}
@@ -147,24 +168,24 @@ export function OpportunityList({
             {opportunity.title}
           </CardTitle>
           <CardDescription className="text-xs md:text-sm text-muted-foreground pt-0.5 line-clamp-1">
-            {opportunity.organization}
+            by {opportunity.organization}
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="p-0 space-y-1.5 text-xs md:text-sm flex-grow">
+        <CardContent className="p-0 space-y-1.5 text-xs md:text-sm flex-grow mt-2">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
             <span className="line-clamp-1">{opportunity.location}</span>
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Activity className="h-3.5 w-3.5 flex-shrink-0" />
-            <Badge variant="secondary" className="text-xs">{opportunity.category}</Badge>
+            <Badge variant="outline" className="text-xs">{opportunity.category}</Badge>
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Clock className="h-3.5 w-3.5 flex-shrink-0" />
             <span className="line-clamp-1">{opportunity.commitment}</span>
           </div>
-          <p className="text-foreground line-clamp-2 pt-2 text-xs leading-relaxed">{opportunity.description}</p>
+          <p className="text-foreground/90 line-clamp-2 pt-2 text-xs leading-relaxed">{opportunity.description}</p>
         </CardContent>
 
         {currentView === 'grid' && (
@@ -175,26 +196,9 @@ export function OpportunityList({
               </Link>
             </Button>
             {user && role === 'volunteer' && (
-                <AlertDialog>
-                 <AlertDialogTrigger asChild>
-                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" title="Contact Organization">
-                     {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
-                   </Button>
-                 </AlertDialogTrigger>
-                 <AlertDialogContent>
-                   <AlertDialogHeader>
-                     <AlertDialogTitle>Contact {opportunity.organization}</AlertDialogTitle>
-                     <AlertDialogDescription>Send a message regarding "{opportunity.title}".</AlertDialogDescription>
-                   </AlertDialogHeader>
-                    <Textarea placeholder="Type your message..." value={messageContent} onChange={(e) => setMessageContent(e.target.value)} className="min-h-[100px]" />
-                   <AlertDialogFooter>
-                     <AlertDialogCancel onClick={() => setMessageContent('')}>Cancel</AlertDialogCancel>
-                     <AlertDialogAction onClick={() => handleContactOrganization(opportunity)} disabled={!messageContent.trim() || contactingOrgId === opportunity.id} className="bg-primary hover:bg-primary/90">
-                       {contactingOrgId === opportunity.id ? 'Sending...' : 'Send Message'}
-                     </AlertDialogAction>
-                   </AlertDialogFooter>
-                 </AlertDialogContent>
-               </AlertDialog>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" title="Contact Organization" onClick={() => openContactDialog(opportunity)}>
+                    {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                  </Button>
             )}
           </CardFooter>
         )}
@@ -203,46 +207,32 @@ export function OpportunityList({
       {/* Right Stats Panel (Inspired by MILKAR, for List View) */}
       {currentView === 'list' && (
         <div className="w-full md:w-1/4 p-4 border-l flex-shrink-0 space-y-3 bg-card/50 md:bg-transparent">
-          <div className="text-xs">
-            <p className="font-medium text-muted-foreground">Points Awarded</p>
-            <p className="text-lg font-bold text-primary">{opportunity.pointsAwarded || 0}</p>
-          </div>
+          {opportunity.pointsAwarded && opportunity.pointsAwarded > 0 && (
+            <div className="text-xs">
+              <p className="font-medium text-muted-foreground">Points</p>
+              <p className="text-lg font-bold text-primary flex items-center gap-1">
+                <Star className="h-4 w-4 text-yellow-500" /> {opportunity.pointsAwarded}
+              </p>
+            </div>
+          )}
           <div className="text-xs">
              <p className="font-medium text-muted-foreground">Category</p>
-             <Badge variant="outline" className="mt-1">{opportunity.category}</Badge>
+             <Badge variant="outline" className="mt-1 text-xs">{opportunity.category}</Badge>
           </div>
-           {/* Placeholder for rating */}
           <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
              {[...Array(5)].map((_,i) => <Star key={i} className={cn("h-3.5 w-3.5", i < Math.round((opportunity.pointsAwarded || 0) / 20) ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground/30")} />)}
-             <span className="ml-1">({((opportunity.pointsAwarded || 0) / 20).toFixed(1)} of 5.0)</span>
+             <span className="ml-1">({((opportunity.pointsAwarded || 0) / 20).toFixed(1)} rating)</span>
           </div>
-          <Button asChild size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button asChild size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground mt-2">
             <Link href={`/apply/${opportunity.id}`} className="flex items-center justify-center gap-1.5">
               <Eye className="h-4 w-4" /> Visit Details
             </Link>
           </Button>
            {user && role === 'volunteer' && (
-                <AlertDialog>
-                 <AlertDialogTrigger asChild>
-                   <Button variant="outline" size="sm" className="w-full" disabled={contactingOrgId === opportunity.id}>
-                     {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1.5" />}
-                      Contact Org
-                   </Button>
-                 </AlertDialogTrigger>
-                 <AlertDialogContent>
-                   <AlertDialogHeader>
-                     <AlertDialogTitle>Contact {opportunity.organization}</AlertDialogTitle>
-                     <AlertDialogDescription>Send a message regarding "{opportunity.title}".</AlertDialogDescription>
-                   </AlertDialogHeader>
-                    <Textarea placeholder="Type your message..." value={messageContent} onChange={(e) => setMessageContent(e.target.value)} className="min-h-[100px]" />
-                   <AlertDialogFooter>
-                     <AlertDialogCancel onClick={() => setMessageContent('')}>Cancel</AlertDialogCancel>
-                     <AlertDialogAction onClick={() => handleContactOrganization(opportunity)} disabled={!messageContent.trim() || contactingOrgId === opportunity.id} className="bg-primary hover:bg-primary/90">
-                       {contactingOrgId === opportunity.id ? 'Sending...' : 'Send Message'}
-                     </AlertDialogAction>
-                   </AlertDialogFooter>
-                 </AlertDialogContent>
-               </AlertDialog>
+                <Button variant="outline" size="sm" className="w-full mt-1.5" onClick={() => openContactDialog(opportunity)} disabled={contactingOrgId === opportunity.id}>
+                  {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1.5" />}
+                   Contact Org
+                </Button>
             )}
         </div>
       )}
@@ -254,7 +244,7 @@ export function OpportunityList({
       {/* Sort and View Toggle Controls */}
       <div className="mb-6 flex flex-wrap gap-2 justify-end items-center">
         <Select value={currentSort} onValueChange={handleSortChange}>
-          <SelectTrigger className="w-auto md:w-[180px] h-9 text-sm bg-card">
+          <SelectTrigger className="w-auto md:w-[180px] h-9 text-sm bg-card border-border shadow-sm">
             <SelectValue placeholder="Sort by..." />
           </SelectTrigger>
           <SelectContent>
@@ -265,12 +255,12 @@ export function OpportunityList({
             ))}
           </SelectContent>
         </Select>
-        <div className="flex items-center rounded-md bg-card border p-0.5">
+        <div className="flex items-center rounded-md bg-card border border-border p-0.5 shadow-sm">
           <Button
             variant={currentView === 'grid' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => handleViewChange('grid')}
-            className={cn("h-8 px-3", currentView === 'grid' ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground')}
+            className={cn("h-8 px-3", currentView === 'grid' ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground hover:bg-muted/50')}
             aria-label="Grid view"
           >
             <LayoutGrid className="h-4 w-4" />
@@ -279,7 +269,7 @@ export function OpportunityList({
             variant={currentView === 'list' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => handleViewChange('list')}
-            className={cn("h-8 px-3", currentView === 'list' ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground')}
+            className={cn("h-8 px-3", currentView === 'list' ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground hover:bg-muted/50')}
             aria-label="List view"
           >
             <List className="h-4 w-4" />
@@ -287,15 +277,46 @@ export function OpportunityList({
         </div>
       </div>
 
-      <div className={`grid gap-6 ${currentView === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+      <div className={`grid gap-6 ${currentView === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
         {opportunities.map((opportunity) => (
           <OpportunityCard key={opportunity.id} opportunity={opportunity} />
         ))}
       </div>
+
+      {/* Contact Dialog */}
+      {currentOpportunityForDialog && (
+        <AlertDialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Contact {currentOpportunityForDialog.organization}</AlertDialogTitle>
+              <AlertDialogDescription>
+                Send a message regarding "{currentOpportunityForDialog.title}".
+                Your name ({user?.displayName}) and email will be shared.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Textarea
+              placeholder="Type your message here..."
+              value={messageContent}
+              onChange={(e) => setMessageContent(e.target.value)}
+              className="min-h-[120px] bg-background"
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setShowContactDialog(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleContactOrganization}
+                disabled={!messageContent.trim() || contactingOrgId === currentOpportunityForDialog.id}
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                {contactingOrgId === currentOpportunityForDialog.id ? (
+                  <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending... </>
+                ) : (
+                  'Send Message'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 }
-
-// Skeleton component is now part of page.tsx to receive the view prop
-// This ensures the skeleton matches the view being loaded.
-// The skeleton in page.tsx has been updated to reflect this new card design.
