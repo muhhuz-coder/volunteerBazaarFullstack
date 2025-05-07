@@ -21,6 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger, // Added AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -204,39 +205,11 @@ export function OpportunityList({
             {user && role === 'volunteer' && (
                  <AlertDialog>
                    <AlertDialogTrigger asChild>
-                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" title="Contact Organization">
+                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" title="Contact Organization" onClick={() => openContactDialog(opportunity)}>
                        {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
                      </Button>
                    </AlertDialogTrigger>
-                   <AlertDialogContent>
-                     <AlertDialogHeader>
-                       <AlertDialogTitle>Contact {opportunity.organization}</AlertDialogTitle>
-                       <AlertDialogDescription>
-                         Send a message regarding "{opportunity.title}".
-                         Your name ({user?.displayName}) and email will be shared.
-                       </AlertDialogDescription>
-                     </AlertDialogHeader>
-                     <Textarea
-                       placeholder="Type your message here..."
-                       value={messageContent}
-                       onChange={(e) => setMessageContent(e.target.value)}
-                       className="min-h-[120px] bg-background"
-                     />
-                     <AlertDialogFooter>
-                       <AlertDialogCancel onClick={() => setCurrentOpportunityForDialog(null)}>Cancel</AlertDialogCancel>
-                       <AlertDialogAction
-                         onClick={() => handleContactOrganization()} // Ensure currentOpportunityForDialog is set before this is called
-                         disabled={!messageContent.trim() || contactingOrgId === opportunity.id}
-                         className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                       >
-                         {contactingOrgId === opportunity.id ? (
-                           <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending... </>
-                         ) : (
-                           'Send Message'
-                         )}
-                       </AlertDialogAction>
-                     </AlertDialogFooter>
-                   </AlertDialogContent>
+                   {/* AlertDialogContent is now managed globally at the bottom */}
                  </AlertDialog>
             )}
           </CardFooter>
@@ -277,40 +250,12 @@ export function OpportunityList({
            {user && role === 'volunteer' && (
                  <AlertDialog>
                    <AlertDialogTrigger asChild>
-                     <Button variant="outline" size="sm" className="w-full mt-1.5" disabled={contactingOrgId === opportunity.id}>
+                     <Button variant="outline" size="sm" className="w-full mt-1.5" disabled={contactingOrgId === opportunity.id} onClick={() => openContactDialog(opportunity)}>
                        {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1.5" />}
                         Contact Org
                      </Button>
                    </AlertDialogTrigger>
-                   <AlertDialogContent>
-                     <AlertDialogHeader>
-                       <AlertDialogTitle>Contact {opportunity.organization}</AlertDialogTitle>
-                       <AlertDialogDescription>
-                         Send a message regarding "{opportunity.title}".
-                         Your name ({user?.displayName}) and email will be shared.
-                       </AlertDialogDescription>
-                     </AlertDialogHeader>
-                     <Textarea
-                       placeholder="Type your message here..."
-                       value={messageContent}
-                       onChange={(e) => setMessageContent(e.target.value)}
-                       className="min-h-[120px] bg-background"
-                     />
-                     <AlertDialogFooter>
-                       <AlertDialogCancel onClick={() => setCurrentOpportunityForDialog(null)}>Cancel</AlertDialogCancel>
-                       <AlertDialogAction
-                         onClick={() => handleContactOrganization()} // Ensure currentOpportunityForDialog is set
-                         disabled={!messageContent.trim() || contactingOrgId === opportunity.id}
-                         className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                       >
-                         {contactingOrgId === opportunity.id ? (
-                           <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending... </>
-                         ) : (
-                           'Send Message'
-                         )}
-                       </AlertDialogAction>
-                     </AlertDialogFooter>
-                   </AlertDialogContent>
+                    {/* AlertDialogContent is now managed globally at the bottom */}
                  </AlertDialog>
             )}
         </div>
@@ -371,7 +316,10 @@ export function OpportunityList({
 
       {/* Contact Dialog: Placed here to be available for any card that triggers it */}
       {currentOpportunityForDialog && user && ( // Ensure user is available for dialog content
-        <AlertDialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+        <AlertDialog open={showContactDialog} onOpenChange={(open) => {
+            setShowContactDialog(open);
+            if (!open) setCurrentOpportunityForDialog(null); // Reset when dialog closes
+        }}>
           {/* The AlertDialogTrigger is handled programmatically by openContactDialog */}
           <VisuallyHidden><AlertDialogTrigger asChild><Button>Open Dialog</Button></AlertDialogTrigger></VisuallyHidden>
           <AlertDialogContent>
