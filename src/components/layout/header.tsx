@@ -2,9 +2,8 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 // Updated icons and added Bell for Notifications, MessageCircle for Chatbot
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, Users } from 'lucide-react'; // Added Users for Volunteers
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, Users, Home } from 'lucide-react'; // Added Home, Briefcase
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +25,6 @@ import { Menu } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { NotificationDropdown } from '@/components/layout/notification-dropdown';
-// ChatbotWidget is removed from here
 
 
 export function Header() {
@@ -40,30 +38,32 @@ export function Header() {
     if (names.length > 1 && names[0].length > 0 && names[names.length - 1].length > 0) {
       return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
     }
-    return name.length > 0 ? name[0].toUpperCase() : 'U'; // Fallback for single long name or empty strings
+    return name.length > 0 ? name[0].toUpperCase() : 'U';
   };
 
   const dashboardPath = role === 'organization' ? '/dashboard/organization'
                       : role === 'volunteer' ? '/dashboard/volunteer'
                       : '/select-role';
 
-   // Add icons to base links, including Chatbot
    const baseNavLinks = [
-     { href: "/", label: "Home", icon: Search },
-     { href: "/volunteers", label: "Volunteers", icon: Users }, // Added Volunteers link
+     { href: "/", label: "Home", icon: Home }, // Changed icon to Home
+     { href: "/opportunities", label: "Opportunities", icon: Briefcase }, // Added Opportunities link
+     { href: "/volunteers", label: "Volunteers", icon: Users },
      { href: "/about", label: "About Us", icon: Info },
      { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
      { href: "/contact", label: "Contact", icon: Mail },
-     // Chatbot page link can be removed if widget is always present, or kept for dedicated page access.
-     // { href: "/chatbot", label: "Chatbot Page", icon: MessageCircle }, 
    ];
 
-   // Ensure user-specific links also have icons if needed
+   // Adjusted navLinks logic to ensure "Home" and "Contact" are correctly placed for logged-in users
    const navLinks = user
      ? [
-         ...baseNavLinks.filter(link => link.href !== '/contact'),
+         { href: "/", label: "Home", icon: Home },
+         { href: "/opportunities", label: "Opportunities", icon: Briefcase },
+         { href: "/volunteers", label: "Volunteers", icon: Users },
          { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
-         { href: "/contact", label: "Contact", icon: Mail }, // Add contact back for logged in users
+         { href: "/about", label: "About Us", icon: Info },
+         { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
+         { href: "/contact", label: "Contact", icon: Mail },
        ]
      : baseNavLinks;
 
@@ -79,9 +79,9 @@ export function Header() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-4">
+        <nav className="hidden md:flex items-center gap-1 lg:gap-2"> {/* Reduced gap slightly */}
            {navLinks.map(link => (
-              <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10 relative">
+              <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10 relative px-2 lg:px-3"> {/* Reduced padding for smaller screens */}
                 <Link href={link.href} className="flex items-center gap-1.5">
                    {link.icon && <link.icon className="h-4 w-4" />}
                    {link.label}
@@ -90,24 +90,21 @@ export function Header() {
            ))}
         </nav>
 
-        <div className="flex items-center gap-2 md:gap-3"> {/* Adjusted gap for consistency */}
-          {/* Chatbot Widget is now globally positioned from RootLayout */}
+        <div className="flex items-center gap-2 md:gap-3">
           
-          {/* Notifications (Visible only when logged in) */}
           {user && !loading && <NotificationDropdown />}
           
-          {/* Auth Section */}
           {loading ? (
              <Skeleton className="h-9 w-9 rounded-full" />
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-primary-foreground/10 p-0"> {/* Ensure padding is 0 for avatar fit */}
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-primary-foreground/10 p-0">
                   <Avatar className="h-9 w-9">
                     {user.profilePictureUrl && (
                        <AvatarImage src={user.profilePictureUrl} alt={user.displayName || 'Profile Picture'} />
                     )}
-                    <AvatarFallback className="bg-primary-foreground text-primary font-semibold text-xs"> {/* Adjusted font size for initials */}
+                    <AvatarFallback className="bg-primary-foreground text-primary font-semibold text-xs">
                       {getInitials(user.displayName || user.email)}
                     </AvatarFallback>
                   </Avatar>
@@ -187,7 +184,6 @@ export function Header() {
              </div>
           )}
 
-          {/* Mobile Menu Trigger */}
           <div className="md:hidden">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
