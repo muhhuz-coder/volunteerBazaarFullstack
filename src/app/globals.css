@@ -24,7 +24,8 @@ body {
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
 
-    --primary: 145 65% 45%; /* Green - Primary Action */
+    /* Milkar-inspired Green */
+    --primary: 142 70% 40%; /* Adjusted Green - Primary Action */
     --primary-foreground: 0 0% 100%; /* White */
 
     --secondary: 210 30% 95%; /* Light Blue-Gray for secondary backgrounds */
@@ -33,7 +34,8 @@ body {
     --muted: 210 25% 90%; /* Muted Blue-Gray */
     --muted-foreground: 220 9% 45%; /* Default muted text */
 
-    --accent: 210 80% 55%; /* Blue - Accent for links, secondary actions */
+    /* Accent color - can be a slightly different green or a complementary color */
+    --accent: 142 60% 50%; /* Slightly lighter/brighter Green for accents */
     --accent-foreground: 0 0% 100%; /* White */
 
     --destructive: 0 84.2% 60.2%; /* Default Red */
@@ -41,25 +43,25 @@ body {
 
     --border: 210 20% 88%; /* Light Blue-Gray Border */
     --input: 210 20% 92%;   /* Slightly darker input background or border */
-    --ring: 145 65% 55%;    /* Green for focus rings (matches primary) */
+    --ring: 142 70% 50%;    /* Green for focus rings (matches primary) */
 
-    --chart-1: 145 60% 50%; /* Variations of Green/Blue for charts */
-    --chart-2: 210 70% 60%;
-    --chart-3: 160 50% 40%;
-    --chart-4: 190 65% 55%;
-    --chart-5: 145 75% 35%;
+    --chart-1: 142 60% 50%; /* Variations of Green for charts */
+    --chart-2: 135 65% 55%;
+    --chart-3: 150 50% 40%;
+    --chart-4: 140 65% 55%;
+    --chart-5: 142 75% 35%;
 
     --radius: 0.5rem;
 
     /* Sidebar variables (adjust to match theme) */
     --sidebar-background: 0 0% 100%; /* White sidebar background */
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 145 65% 45%; /* Match main primary (Green) */
+    --sidebar-primary: 142 70% 40%; /* Match main primary (Green) */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 30% 96%; /* Very light blue-gray for hover/active */
-    --sidebar-accent-foreground: 145 65% 40%; /* Darker Green for text on accent */
+    --sidebar-accent-foreground: 142 70% 35%; /* Darker Green for text on accent */
     --sidebar-border: 210 20% 88%;
-    --sidebar-ring: 145 65% 55%; /* Match main ring (Green) */
+    --sidebar-ring: 142 70% 50%; /* Match main ring (Green) */
   }
 
   .dark {
@@ -73,7 +75,7 @@ body {
     --popover: 220 15% 14%;
     --popover-foreground: 210 20% 98%;
 
-    --primary: 145 60% 55%; /* Brighter Green */
+    --primary: 142 65% 50%; /* Brighter Green */
     --primary-foreground: 220 15% 10%; /* Dark for contrast */
 
     --secondary: 220 15% 18%; /* Darker Gray */
@@ -82,7 +84,7 @@ body {
     --muted: 220 15% 22%; /* Dark Muted Gray */
     --muted-foreground: 210 15% 65%; /* Lighter Muted Text */
 
-    --accent: 210 70% 65%; /* Lighter, Vibrant Blue */
+    --accent: 142 60% 60%; /* Lighter, Vibrant Green */
     --accent-foreground: 220 15% 10%; /* Dark for contrast */
 
     --destructive: 0 70% 55%; /* Slightly Brighter Red */
@@ -90,23 +92,23 @@ body {
 
     --border: 220 15% 25%; /* Dark Border */
     --input: 220 15% 20%;   /* Darker Input */
-    --ring: 145 60% 60%;    /* Lighter Green for focus rings */
+    --ring: 142 65% 55%;    /* Lighter Green for focus rings */
 
-    --chart-1: 145 55% 60%;
-    --chart-2: 210 65% 70%;
-    --chart-3: 160 45% 50%;
-    --chart-4: 190 60% 65%;
-    --chart-5: 145 70% 45%;
+    --chart-1: 142 55% 60%;
+    --chart-2: 135 60% 65%;
+    --chart-3: 150 45% 50%;
+    --chart-4: 140 60% 65%;
+    --chart-5: 142 70% 45%;
 
     /* Sidebar variables (dark) */
     --sidebar-background: 220 15% 12%; /* Match card background */
     --sidebar-foreground: 210 15% 95%;
-    --sidebar-primary: 145 60% 55%; /* Match primary */
+    --sidebar-primary: 142 65% 50%; /* Match primary */
     --sidebar-primary-foreground: 220 15% 10%;
     --sidebar-accent: 220 15% 20%; /* Slightly lighter than sidebar bg for hover */
-    --sidebar-accent-foreground: 145 60% 65%; /* Lighter green for text on accent */
+    --sidebar-accent-foreground: 142 60% 65%; /* Lighter green for text on accent */
     --sidebar-border: 220 15% 25%;
-    --sidebar-ring: 145 60% 60%;
+    --sidebar-ring: 142 65% 55%;
   }
 }
 

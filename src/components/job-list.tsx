@@ -286,6 +286,10 @@ export function OpportunityList({
       {/* Contact Dialog */}
       {currentOpportunityForDialog && (
         <AlertDialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+          <AlertDialogTrigger asChild>
+            {/* This trigger is now implicitly handled by openContactDialog */}
+            <VisuallyHidden><Button>Open Dialog</Button></VisuallyHidden>
+          </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Contact {currentOpportunityForDialog.organization}</AlertDialogTitle>
