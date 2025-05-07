@@ -20,20 +20,20 @@ export function ChatbotWidget() {
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
-          className="rounded-full h-12 w-12 shadow-lg hover:bg-accent/20 focus:ring-2 focus:ring-accent focus:ring-offset-2 fixed bottom-6 right-6 z-50 bg-primary text-primary-foreground hover:bg-primary/90"
+          className="relative h-9 w-9 rounded-full hover:bg-primary-foreground/10"
           aria-label="Open chatbot"
         >
-          <MessageCircle className="h-6 w-6" />
+          <MessageCircle className="h-5 w-5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        side="top"
+        side="bottom" // Changed from "top" as it's now in the header
         align="end"
-        sideOffset={8} // Added a bit more offset from the trigger
-        className="w-[300px] h-[450px] sm:w-[380px] sm:h-[550px] p-0 border-0 shadow-2xl rounded-lg z-50 flex flex-col" // Removed fixed, bottom, right. Relies on Radix for positioning.
-        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
+        sideOffset={8} 
+        className="w-[300px] h-[450px] sm:w-[380px] sm:h-[550px] p-0 border-0 shadow-2xl rounded-lg z-50 flex flex-col"
+        onOpenAutoFocus={(e) => e.preventDefault()} 
       >
         <Card className="flex flex-col h-full w-full border-0 shadow-none rounded-lg overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between p-3 border-b bg-primary text-primary-foreground">
@@ -54,4 +54,3 @@ export function ChatbotWidget() {
     </Popover>
   );
 }
-

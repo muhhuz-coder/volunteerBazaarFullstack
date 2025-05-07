@@ -54,13 +54,14 @@ export function Header() {
      { href: "/about", label: "About Us", icon: Info },
      { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
      { href: "/contact", label: "Contact", icon: Mail },
-     { href: "/chatbot", label: "Chatbot Page", icon: MessageCircle },
+     // Chatbot page link can be removed if widget is always present, or kept for dedicated page access.
+     // { href: "/chatbot", label: "Chatbot Page", icon: MessageCircle }, 
    ];
 
    // Ensure user-specific links also have icons if needed
    const navLinks = user
      ? [
-         ...baseNavLinks.filter(link => link.href !== '/contact' && link.href !== '/chatbot'), // Remove chatbot page if widget exists
+         ...baseNavLinks.filter(link => link.href !== '/contact'),
          { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
          { href: "/contact", label: "Contact", icon: Mail }, // Add contact back for logged in users
        ]
@@ -81,7 +82,6 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-4">
            {navLinks.map(link => (
               <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10 relative">
-                 {/* Ensure link content includes icon */}
                 <Link href={link.href} className="flex items-center gap-1.5">
                    {link.icon && <link.icon className="h-4 w-4" />}
                    {link.label}
@@ -90,7 +90,10 @@ export function Header() {
            ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3"> {/* Adjusted gap for consistency */}
+          {/* Chatbot Widget (Visible on all screen sizes, styled to fit header) */}
+          <ChatbotWidget />
+
           {/* Notifications (Visible only when logged in) */}
           {user && !loading && <NotificationDropdown />}
           
@@ -100,12 +103,12 @@ export function Header() {
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-primary-foreground/10">
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-primary-foreground/10 p-0"> {/* Ensure padding is 0 for avatar fit */}
                   <Avatar className="h-9 w-9">
                     {user.profilePictureUrl && (
                        <AvatarImage src={user.profilePictureUrl} alt={user.displayName || 'Profile Picture'} />
                     )}
-                    <AvatarFallback className="bg-primary-foreground text-primary font-semibold">
+                    <AvatarFallback className="bg-primary-foreground text-primary font-semibold text-xs"> {/* Adjusted font size for initials */}
                       {getInitials(user.displayName || user.email)}
                     </AvatarFallback>
                   </Avatar>
@@ -249,8 +252,7 @@ export function Header() {
           </div>
         </div>
       </div>
-      <ChatbotWidget />
+      {/* ChatbotWidget is now rendered as a fixed element at the bottom right by its own styling */}
     </header>
   );
 }
-
