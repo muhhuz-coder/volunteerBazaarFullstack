@@ -95,13 +95,13 @@ export default async function OpportunitiesPage({
     commitment?: string;
     view?: 'grid' | 'list';
     sort?: string;
-    tab?: 'all' | 'active' | 'archived'; // New tab parameter
+    tab?: 'all' | 'active' | 'archived';
   };
 }) {
-  const keywords = searchParams?.keywords || '';
-  const category = searchParams?.category || '';
-  const location = searchParams?.location || '';
-  const commitment = searchParams?.commitment || '';
+  const keywords = searchParams?.keywords;
+  const category = searchParams?.category;
+  const location = searchParams?.location;
+  const commitment = searchParams?.commitment;
   const view = searchParams?.view || 'grid';
   const sort = searchParams?.sort || 'recent';
   const currentTab = searchParams?.tab || 'all';
@@ -112,19 +112,21 @@ export default async function OpportunitiesPage({
     location,
     commitment,
     sort,
-    currentTab as 'all' | 'active' | 'archived' // Pass tab to action
+    currentTab as 'all' | 'active' | 'archived'
   );
 
   const createTabLink = (tabValue: 'all' | 'active' | 'archived') => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams();
+    // Add existing parameters back, except for 'tab'
+    if (keywords) params.set('keywords', keywords);
+    if (category && category !== 'All') params.set('category', category);
+    if (location) params.set('location', location);
+    if (commitment && commitment !== 'All') params.set('commitment', commitment);
+    if (view) params.set('view', view);
+    if (sort) params.set('sort', sort);
+    
+    // Set the new tab value
     params.set('tab', tabValue);
-    // Keep other params
-    if (keywords) params.set('keywords', keywords); else params.delete('keywords');
-    if (category && category !== 'All') params.set('category', category); else params.delete('category');
-    if (location) params.set('location', location); else params.delete('location');
-    if (commitment && commitment !== 'All') params.set('commitment', commitment); else params.delete('commitment');
-    if (view) params.set('view', view); else params.delete('view');
-    if (sort) params.set('sort', sort); else params.delete('sort');
     return `/opportunities?${params.toString()}`;
   };
 
@@ -163,7 +165,6 @@ export default async function OpportunitiesPage({
                   <Link href={createTabLink('archived')}>Archived</Link>
                 </TabsTrigger>
               </TabsList>
-              {/* No TabsContent needed here as OpportunityList below will render the filtered data based on currentTab */}
             </Tabs>
             
             <Suspense fallback={<OpportunityListSkeleton view={view} />}>
