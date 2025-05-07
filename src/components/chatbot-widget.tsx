@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -30,7 +31,8 @@ export function ChatbotWidget() {
       <PopoverContent
         side="top"
         align="end"
-        className="w-[300px] h-[450px] sm:w-[380px] sm:h-[550px] p-0 border-0 shadow-2xl rounded-lg fixed bottom-[calc(3.5rem+1.5rem)] right-6 z-50 flex flex-col" // Adjusted position
+        sideOffset={8} // Added a bit more offset from the trigger
+        className="w-[300px] h-[450px] sm:w-[380px] sm:h-[550px] p-0 border-0 shadow-2xl rounded-lg z-50 flex flex-col" // Removed fixed, bottom, right. Relies on Radix for positioning.
         onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
       >
         <Card className="flex flex-col h-full w-full border-0 shadow-none rounded-lg overflow-hidden">
@@ -52,3 +54,4 @@ export function ChatbotWidget() {
     </Popover>
   );
 }
+
