@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 // Updated icons and added Bell for Notifications, MessageCircle for Chatbot
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, MessageCircle } from 'lucide-react'; // Added MessageCircle
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, MessageCircle, Users } from 'lucide-react'; // Added Users for Volunteers
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,8 +25,8 @@ import {
 import { Menu } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { NotificationDropdown } from '@/components/layout/notification-dropdown'; // Import NotificationDropdown
-import { ChatbotWidget } from '@/components/chatbot-widget'; // Import ChatbotWidget
+import { NotificationDropdown } from '@/components/layout/notification-dropdown';
+import { ChatbotWidget } from '@/components/chatbot-widget';
 
 
 export function Header() {
@@ -48,14 +48,13 @@ export function Header() {
                       : '/select-role';
 
    // Add icons to base links, including Chatbot
-   // Removed /analytics link as it's integrated into homepage
    const baseNavLinks = [
-     { href: "/", label: "Home", icon: Search }, // Changed "Opportunities" to "Home"
+     { href: "/", label: "Home", icon: Search },
+     { href: "/volunteers", label: "Volunteers", icon: Users }, // Added Volunteers link
      { href: "/about", label: "About Us", icon: Info },
      { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
      { href: "/contact", label: "Contact", icon: Mail },
-     // { href: "/analytics", label: "Analytics", icon: BarChart3 }, // Removed dedicated analytics link
-     { href: "/chatbot", label: "Chatbot Page", icon: MessageCircle }, // Renamed for clarity from widget
+     { href: "/chatbot", label: "Chatbot Page", icon: MessageCircle },
    ];
 
    // Ensure user-specific links also have icons if needed
@@ -95,11 +94,6 @@ export function Header() {
           {/* Notifications (Visible only when logged in) */}
           {user && !loading && <NotificationDropdown />}
           
-          {/* Chatbot Widget (Always visible for now, or conditionally) */}
-          {/* The ChatbotWidget is a floating button, so it's not placed directly in the header flow */}
-          {/* <ChatbotWidget />  This line might be removed if ChatbotWidget positions itself fixed */}
-
-
           {/* Auth Section */}
           {loading ? (
              <Skeleton className="h-9 w-9 rounded-full" />
@@ -158,7 +152,6 @@ export function Header() {
                           <span>Messages</span>
                          </Link>
                       </DropdownMenuItem>
-                      {/* Add Notifications link in dropdown */}
                        <DropdownMenuItem asChild>
                            <Link href="/notifications">
                                <Bell className="mr-2 h-4 w-4" />
@@ -204,7 +197,6 @@ export function Header() {
               <SheetContent side="right" className="w-[280px] bg-background text-foreground p-4 flex flex-col">
                  <h2 className="text-lg font-semibold mb-4 border-b pb-2">Menu</h2>
                  <nav className="flex flex-col gap-2 mb-6">
-                     {/* Ensure mobile links also render icons */}
                     {navLinks.map(link => (
                        <Button key={link.href} variant="ghost" asChild className="justify-start text-base" onClick={closeMobileMenu}>
                          <Link href={link.href} className="flex items-center gap-2">
@@ -232,9 +224,8 @@ export function Header() {
                             <MessageSquare className="mr-2 h-5 w-5" /> Messages
                           </Link>
                        </Button>
-                       {/* Add Notifications link to mobile menu */}
                        <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base" onClick={closeMobileMenu}>
-                         <Link href="/notifications" className="flex items-center"> {/* Assuming a /notifications page */}
+                         <Link href="/notifications" className="flex items-center"> 
                            <Bell className="mr-2 h-5 w-5" /> Notifications
                          </Link>
                        </Button>
@@ -258,8 +249,8 @@ export function Header() {
           </div>
         </div>
       </div>
-      {/* The ChatbotWidget positions itself as fixed, so it's placed outside the direct header flow for layout purposes */}
       <ChatbotWidget />
     </header>
   );
 }
+
