@@ -13,19 +13,20 @@ import type { Opportunity, VolunteerApplication } from '@/services/job-board';
 
 /**
  * Server action to get volunteer opportunities.
- * Now includes location, commitment, and sort parameters.
+ * Now includes location, commitment, sort, and tab parameters.
  */
 export async function getOpportunitiesAction(
     keywords?: string,
     category?: string,
     location?: string, // New parameter
     commitment?: string, // New parameter
-    sort?: string // New parameter for sorting (e.g., 'recent', 'title_asc')
+    sort?: string, // New parameter for sorting (e.g., 'recent', 'title_asc')
+    tab?: 'all' | 'active' | 'archived' // New parameter for tabs
 ): Promise<Opportunity[]> {
-    console.log('Server Action: Getting opportunities. Keywords:', keywords, 'Category:', category, 'Location:', location, 'Commitment:', commitment, 'Sort:', sort);
+    console.log('Server Action: Getting opportunities. Keywords:', keywords, 'Category:', category, 'Location:', location, 'Commitment:', commitment, 'Sort:', sort, 'Tab:', tab);
     try {
         // Pass new parameters to the service layer
-        const opportunities = await getOpportunitiesService(keywords, category, location, commitment, sort);
+        const opportunities = await getOpportunitiesService(keywords, category, location, commitment, sort, tab);
         return opportunities;
     } catch (error: any) {
         console.error("Server Action: Get opportunities error -", error);
@@ -88,7 +89,7 @@ export async function createOpportunityAction(
         if (!opportunityData.title || !opportunityData.description || !opportunityData.location || !opportunityData.commitment || !opportunityData.category) {
             return { success: false, message: 'Missing required opportunity details.', opportunity: null };
         }
-        if (opportunityData.imageUrl && !opportunityData.imageUrl.startsWith('data:image')) {
+        if (opportunityData.imageUrl && !opportunityData.imageUrl.startsWith('data:image') && !opportunityData.imageUrl.startsWith('http')) {
              return { success: false, message: 'Invalid image format provided.', opportunity: null };
         }
 

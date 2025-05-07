@@ -7,6 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getOpportunitiesAction } from '@/actions/job-board-actions';
 import { Briefcase, MapPin, Activity, Clock, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
 
 // Re-using the skeleton from the previous page.tsx
 function OpportunityListSkeleton({ view = 'grid' }: { view?: 'grid' | 'list' }) {
@@ -93,6 +95,7 @@ export default async function OpportunitiesPage({
     commitment?: string;
     view?: 'grid' | 'list';
     sort?: string;
+    tab?: 'all' | 'active' | 'archived'; // New tab parameter
   };
 }) {
   const keywords = searchParams?.keywords || '';
@@ -101,8 +104,29 @@ export default async function OpportunitiesPage({
   const commitment = searchParams?.commitment || '';
   const view = searchParams?.view || 'grid';
   const sort = searchParams?.sort || 'recent';
+  const currentTab = searchParams?.tab || 'all';
 
-  const opportunities = await getOpportunitiesAction(keywords, category, location, commitment, sort);
+  const opportunities = await getOpportunitiesAction(
+    keywords,
+    category,
+    location,
+    commitment,
+    sort,
+    currentTab as 'all' | 'active' | 'archived' // Pass tab to action
+  );
+
+  const createTabLink = (tabValue: 'all' | 'active' | 'archived') => {
+    const params = new URLSearchParams(searchParams);
+    params.set('tab', tabValue);
+    // Keep other params
+    if (keywords) params.set('keywords', keywords); else params.delete('keywords');
+    if (category && category !== 'All') params.set('category', category); else params.delete('category');
+    if (location) params.set('location', location); else params.delete('location');
+    if (commitment && commitment !== 'All') params.set('commitment', commitment); else params.delete('commitment');
+    if (view) params.set('view', view); else params.delete('view');
+    if (sort) params.set('sort', sort); else params.delete('sort');
+    return `/opportunities?${params.toString()}`;
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
@@ -119,13 +143,29 @@ export default async function OpportunitiesPage({
           </aside>
 
           <main className="w-full md:w-3/4 lg:w-4/5">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
               <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center">
                 <Briefcase className="mr-3 h-7 w-7" />
                 Volunteer Opportunities
-                <span className="ml-2 text-sm font-normal text-muted-foreground">({opportunities.length} Found)</span>
               </h1>
+               <span className="text-sm font-normal text-muted-foreground">({opportunities.length} Found in "{currentTab.charAt(0).toUpperCase() + currentTab.slice(1)}" tab)</span>
             </div>
+
+            <Tabs value={currentTab} className="mb-6">
+              <TabsList>
+                <TabsTrigger value="all" asChild>
+                  <Link href={createTabLink('all')}>All</Link>
+                </TabsTrigger>
+                <TabsTrigger value="active" asChild>
+                  <Link href={createTabLink('active')}>Active/New</Link>
+                </TabsTrigger>
+                <TabsTrigger value="archived" asChild>
+                  <Link href={createTabLink('archived')}>Archived</Link>
+                </TabsTrigger>
+              </TabsList>
+              {/* No TabsContent needed here as OpportunityList below will render the filtered data based on currentTab */}
+            </Tabs>
+            
             <Suspense fallback={<OpportunityListSkeleton view={view} />}>
               <OpportunityList
                 initialOpportunities={opportunities}

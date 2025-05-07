@@ -16,7 +16,7 @@ export interface Opportunity {
   commitment: string;
   category: string;
   pointsAwarded?: number; // Optional points awarded upon completion/acceptance
-  imageUrl?: string; // Optional image for the opportunity (Data URI)
+  imageUrl?: string; // Optional image for the opportunity (Data URI or URL)
   createdAt?: Date | string; // Optional: Timestamp for when opportunity was created for sorting
 }
 
@@ -71,6 +71,7 @@ async function loadApplicationsData(): Promise<VolunteerApplication[]> {
  * @param location Location to filter opportunities.
  * @param commitment Commitment type to filter opportunities.
  * @param sort Sorting criteria.
+ * @param tab Tab filter for opportunity status (all, active, archived).
  * @returns A promise that resolves to an array of Opportunity objects.
  */
 export async function getOpportunities(
@@ -78,9 +79,10 @@ export async function getOpportunities(
     category?: string,
     location?: string,
     commitment?: string,
-    sort: string = 'recent' // Default sort by recent
+    sort: string = 'recent', // Default sort by recent
+    tab: 'all' | 'active' | 'archived' = 'all' // New parameter for tabs
 ): Promise<Opportunity[]> {
-  console.log(`Fetching opportunities with keywords: "${keywords}", category: "${category}", location: "${location}", commitment: "${commitment}", sort: "${sort}"`);
+  console.log(`Fetching opportunities with keywords: "${keywords}", category: "${category}", location: "${location}", commitment: "${commitment}", sort: "${sort}", tab: "${tab}"`);
   await sleep(100); 
   let opportunitiesData = await loadOpportunitiesData();
 
@@ -108,6 +110,23 @@ export async function getOpportunities(
     opportunitiesData = opportunitiesData.filter(opp => opp.commitment.toLowerCase().includes(commitment.toLowerCase()));
   }
 
+  // Apply tab-based filtering based on createdAt
+  if (tab === 'active') {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    opportunitiesData = opportunitiesData.filter(opp => {
+      const createdAtDate = opp.createdAt instanceof Date ? opp.createdAt : new Date(opp.createdAt || 0);
+      return createdAtDate >= thirtyDaysAgo;
+    });
+  } else if (tab === 'archived') {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    opportunitiesData = opportunitiesData.filter(opp => {
+      const createdAtDate = opp.createdAt instanceof Date ? opp.createdAt : new Date(opp.createdAt || 0);
+      return createdAtDate < thirtyDaysAgo;
+    });
+  }
+
   // Sorting logic
   switch (sort) {
     case 'title_asc':
@@ -118,12 +137,16 @@ export async function getOpportunities(
       break;
     case 'recent': // Default sort by createdAt descending (newest first)
     default:
-      opportunitiesData.sort((a, b) => (b.createdAt as Date).getTime() - (a.createdAt as Date).getTime());
+      opportunitiesData.sort((a, b) => {
+        const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
+        const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
       break;
   }
 
 
-  console.log(`Returning ${opportunitiesData.length} opportunities.`);
+  console.log(`Returning ${opportunitiesData.length} opportunities after tab and sort.`);
   return [...opportunitiesData]; // Return a copy
 }
 
@@ -271,5 +294,8 @@ export async function getOpportunityById(id: string): Promise<Opportunity | unde
     await sleep(50);
     const opportunitiesData = await loadOpportunitiesData();
     const opportunity = opportunitiesData.find(opp => opp.id === id);
+    if (opportunity && opportunity.createdAt) {
+      opportunity.createdAt = new Date(opportunity.createdAt);
+    }
     return opportunity ? { ...opportunity } : undefined;
 }
