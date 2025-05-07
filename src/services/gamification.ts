@@ -208,12 +208,13 @@ export async function getLeaderboard(limit: number = 10): Promise<LeaderboardEnt
 
 /**
  * Logs volunteer hours and saves the updated data.
+ * This function will also trigger checks for hour-based badges.
  * @param userId The ID of the volunteer.
  * @param hours The number of hours to log.
- * @param opportunityId The ID of the opportunity the hours relate to (used in reason).
+ * @param reason The reason for logging hours (e.g., opportunity ID/title).
  * @returns A promise that resolves to the updated VolunteerStats object.
  */
-export async function logHours(userId: string, hours: number, opportunityId: string): Promise<VolunteerStats> {
+export async function logHours(userId: string, hours: number, reason: string): Promise<VolunteerStats> {
     if (hours <= 0) {
         return await getUserStats(userId); // Return current stats if no hours added
     }
@@ -232,7 +233,7 @@ export async function logHours(userId: string, hours: number, opportunityId: str
         userId,
         type: 'hours',
         value: hours,
-        reason: `Logged hours for opportunity ${opportunityId}`,
+        reason: reason,
         timestamp: new Date(),
     };
     gamificationLogData.push(logEntry);
@@ -241,35 +242,42 @@ export async function logHours(userId: string, hours: number, opportunityId: str
     await writeData(USER_STATS_FILE, mapToObject(userStatsData));
     await writeData(GAMIFICATION_LOG_FILE, gamificationLogData);
 
-    console.log(`Logged ${hours} hours for user ${userId} for opportunity ${opportunityId}. Total hours: ${stats.hours}. Data saved.`);
+    console.log(`Logged ${hours} hours for user ${userId} for: ${reason}. Total hours: ${stats.hours}. Data saved.`);
 
-    // Trigger badge awards based on new hour total (this will also save data again)
+    // Trigger badge awards based on new hour total
+    // This function will fetch the latest stats internally after badge awards.
     const finalStats = await checkAndAwardHourBadges(userId, stats.hours);
     return finalStats;
 }
 
 /**
  * Helper function to check hour milestones and award badges.
+ * This function is called internally by `logHours`.
  * Returns the latest stats after potentially awarding badges.
  */
-export async function checkAndAwardHourBadges(userId: string, totalHours: number): Promise<VolunteerStats> {
-     let stats = await getUserStats(userId); // Get potentially updated stats
-    let awardedNewBadge = false;
+async function checkAndAwardHourBadges(userId: string, totalHours: number): Promise<VolunteerStats> {
+    // Get current stats to check existing badges
+    let stats = await getUserStats(userId);
+    
+    const badgesToAward: { name: string; reason: string; threshold: number }[] = [
+        { name: '10 Hour Hero', reason: 'Logged 10+ volunteer hours', threshold: 10 },
+        { name: '25 Hour Champion', reason: 'Logged 25+ volunteer hours', threshold: 25 },
+        { name: '50 Hour Superstar', reason: 'Logged 50+ volunteer hours', threshold: 50 },
+        { name: '100 Hour Legend', reason: 'Logged 100+ volunteer hours', threshold: 100 },
+    ];
 
-    if (totalHours >= 10 && !stats.badges.includes('10 Hour Hero')) {
-        stats = await awardBadge(userId, '10 Hour Hero', 'Logged 10+ volunteer hours');
-        awardedNewBadge = true;
-    }
-    // Check subsequent badges only if stats were potentially updated by the previous check
-    if (totalHours >= 50 && !stats.badges.includes('50 Hour Superstar')) {
-        stats = await awardBadge(userId, '50 Hour Superstar', 'Logged 50+ volunteer hours');
-        awardedNewBadge = true;
-    }
-    // Add more milestones as needed
+    let awardedNewBadgeThisCall = false;
 
-     // Return the latest version of stats
-     // If a badge was awarded, awardBadge already returned the updated stats.
-     // If no badge was awarded, getUserStats fetched the latest.
+    for (const badge of badgesToAward) {
+        if (totalHours >= badge.threshold && !stats.badges.includes(badge.name)) {
+            stats = await awardBadge(userId, badge.name, badge.reason); // awardBadge updates and saves
+            awardedNewBadgeThisCall = true; // A badge was awarded in this iteration
+        }
+    }
+    
+    // If no new badge was awarded in this call, the `stats` variable holds the latest stats
+    // fetched at the beginning of this function. If a badge *was* awarded, `stats`
+    // was updated by `awardBadge` to reflect the new badge.
     return stats;
 }
 
@@ -285,6 +293,6 @@ export async function checkAndAwardHourBadges(userId: string, totalHours: number
 export async function recordOpportunityCompletion(userId: string, opportunityId: string, opportunityPoints: number, hoursVolunteered: number): Promise<VolunteerStats> {
    await addPoints(userId, opportunityPoints, `Completed opportunity ${opportunityId}`);
    // logHours handles saving and badge checks, and returns the final stats
-   const finalStats = await logHours(userId, hoursVolunteered, opportunityId);
+   const finalStats = await logHours(userId, hoursVolunteered, `Volunteered for opportunity: ${opportunityId}`);
    return finalStats;
 }

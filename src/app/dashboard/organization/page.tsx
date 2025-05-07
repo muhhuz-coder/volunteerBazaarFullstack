@@ -10,7 +10,7 @@ import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download } from 'lucide-react'; // Added Briefcase, Settings, Download
+import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download, Edit3 } from 'lucide-react'; // Added Edit3 for performance
 // Remove direct service imports
 import type { Opportunity, VolunteerApplication } from '@/services/job-board'; // Keep types
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,15 @@ import { Badge } from '@/components/ui/badge';
 import { getOpportunitiesAction, getApplicationsForOrganizationAction } from '@/actions/job-board-actions';
 import { acceptVolunteerApplication, rejectVolunteerApplication } from '@/actions/application-actions';
 import { cn } from '@/lib/utils'; // Import cn
+import { AttendanceForm } from '@/components/dashboard/organization/attendance-form'; // Import AttendanceForm
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 
 export default function OrganizationDashboard() {
@@ -30,6 +39,8 @@ export default function OrganizationDashboard() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loadingData, setLoadingData] = useState(true); // Combined loading state
   const [processingAppId, setProcessingAppId] = useState<string | null>(null);
+  const [selectedAppForPerformance, setSelectedAppForPerformance] = useState<VolunteerApplication | null>(null);
+
 
   const fetchData = useCallback(async () => {
     if (user && role === 'organization') {
@@ -76,9 +87,9 @@ export default function OrganizationDashboard() {
      setProcessingAppId(app.id);
      try {
         const result = await acceptVolunteerApplication(app.id, app.volunteerId, user.id, user.displayName);
-        if (result.success) {
+        if (result.success && result.updatedApp) {
            toast({ title: 'Success', description: `Application accepted. Conversation started.` });
-           setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'accepted' } : a));
+           setApplications(prev => prev.map(a => a.id === app.id ? result.updatedApp! : a));
            if (result.conversationId) {
               router.push(`/dashboard/messages/${result.conversationId}`);
            }
@@ -97,9 +108,9 @@ export default function OrganizationDashboard() {
       setProcessingAppId(app.id);
       try {
           const result = await rejectVolunteerApplication(app.id);
-           if (result.success) {
+           if (result.success && result.updatedApp) {
                toast({ title: 'Success', description: `Application rejected.` });
-               setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'rejected' } : a));
+               setApplications(prev => prev.map(a => a.id === app.id ? result.updatedApp! : a));
            } else {
                toast({ title: 'Error', description: result.message, variant: 'destructive' });
            }
@@ -126,6 +137,11 @@ export default function OrganizationDashboard() {
     } else {
       toast({ title: "Popup Blocked", description: "Please allow popups for this site to view attachments.", variant: "destructive" });
     }
+  };
+
+  const handlePerformanceFormSubmit = (updatedApplication: VolunteerApplication) => {
+    setApplications(prevApps => prevApps.map(app => app.id === updatedApplication.id ? updatedApplication : app));
+    setSelectedAppForPerformance(null); // Close dialog
   };
 
 
@@ -169,7 +185,10 @@ export default function OrganizationDashboard() {
    }
 
   console.log('Rendering organization dashboard for user:', user?.email);
-  const submittedApplications = applications.filter(app => app.status === 'submitted');
+  const newApplications = applications.filter(app => app.status === 'submitted');
+  const acceptedApplications = applications.filter(app => app.status === 'accepted');
+  const completedApplications = applications.filter(app => app.status === 'completed');
+  const rejectedApplications = applications.filter(app => app.status === 'rejected');
 
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
@@ -247,69 +266,130 @@ export default function OrganizationDashboard() {
 
 
         {/* Applications Section */}
-        <Card className="shadow-lg border">
-          <CardHeader>
-            <CardTitle>New Volunteer Applications ({submittedApplications.length})</CardTitle>
-            <CardDescription>Review and respond to volunteers who expressed interest.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {submittedApplications.length > 0 ? (
-              <div className="space-y-4">
-                {submittedApplications.map(app => (
-                  <Card key={app.id} className="bg-card/80 border">
-                    <CardHeader className="pb-2">
-                      <div className="flex flex-wrap justify-between items-start gap-2">
-                         <div>
-                            <CardTitle className="text-lg">{app.applicantName}</CardTitle>
-                            <CardDescription>Interested in: {app.opportunityTitle}</CardDescription>
-                            <CardDescription>Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : 'Invalid Date'}</CardDescription>
-                         </div>
-                          <Badge variant="secondary" className="capitalize">{app.status}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="text-sm space-y-1 pb-3">
-                       <p><span className="font-medium">Email:</span> {app.applicantEmail}</p>
-                       {app.coverLetter && <p><span className="font-medium">Statement:</span> {app.coverLetter.substring(0, 100)}{app.coverLetter.length > 100 ? '...' : ''}</p>}
-                       {app.resumeUrl && app.resumeUrl.startsWith('data:') ? (
-                         <p className="flex items-center gap-2">
-                           <span className="font-medium">Attachment:</span>
-                           <Button variant="link" size="sm" className="h-auto p-0 text-accent" onClick={() => handleViewAttachment(app.resumeUrl!)}>
-                             <Download className="mr-1 h-4 w-4" /> View Document
-                           </Button>
-                         </p>
-                       ) : app.resumeUrl ? (
-                         <p><span className="font-medium">Attachment:</span> <span className="text-muted-foreground italic">(Invalid or old format)</span></p>
-                       ) : null}
-                    </CardContent>
-                    <CardFooter className="flex justify-end gap-2 pt-3 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleReject(app)}
-                        disabled={processingAppId === app.id}
-                      >
-                        {processingAppId === app.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4 mr-1" />}
-                        Reject
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => handleAccept(app)}
-                        disabled={processingAppId === app.id}
-                      >
-                         {processingAppId === app.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-                        Accept & Message
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-4">No new applications to review.</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* New Applications */}
+            <Card className="shadow-lg border">
+              <CardHeader>
+                <CardTitle>New Volunteer Applications ({newApplications.length})</CardTitle>
+                <CardDescription>Review and respond to volunteers.</CardDescription>
+              </CardHeader>
+              <CardContent className="max-h-[500px] overflow-y-auto pr-2">
+                {newApplications.length > 0 ? (
+                  <div className="space-y-4">
+                    {newApplications.map(app => (
+                      <Card key={app.id} className="bg-card/80 border">
+                        <CardHeader className="pb-2">
+                          <div className="flex flex-wrap justify-between items-start gap-2">
+                             <div>
+                                <CardTitle className="text-lg">{app.applicantName}</CardTitle>
+                                <CardDescription>Interested in: {app.opportunityTitle}</CardDescription>
+                                <CardDescription>Submitted: {app.submittedAt instanceof Date ? app.submittedAt.toLocaleDateString() : 'Invalid Date'}</CardDescription>
+                             </div>
+                              <Badge variant="secondary" className="capitalize">{app.status}</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-1 pb-3">
+                           <p><span className="font-medium">Email:</span> {app.applicantEmail}</p>
+                           {app.coverLetter && <p><span className="font-medium">Statement:</span> {app.coverLetter.substring(0, 100)}{app.coverLetter.length > 100 ? '...' : ''}</p>}
+                           {app.resumeUrl && app.resumeUrl.startsWith('data:') ? (
+                             <p className="flex items-center gap-2">
+                               <span className="font-medium">Attachment:</span>
+                               <Button variant="link" size="sm" className="h-auto p-0 text-accent" onClick={() => handleViewAttachment(app.resumeUrl!)}>
+                                 <Download className="mr-1 h-4 w-4" /> View Document
+                               </Button>
+                             </p>
+                           ) : app.resumeUrl ? (
+                             <p><span className="font-medium">Attachment:</span> <span className="text-muted-foreground italic">(Invalid or old format)</span></p>
+                           ) : null}
+                        </CardContent>
+                        <CardFooter className="flex justify-end gap-2 pt-3 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleReject(app)}
+                            disabled={processingAppId === app.id}
+                          >
+                            {processingAppId === app.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4 mr-1" />}
+                            Reject
+                          </Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleAccept(app)}
+                            disabled={processingAppId === app.id}
+                          >
+                             {processingAppId === app.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+                            Accept & Message
+                          </Button>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-4">No new applications to review.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Accepted/Ongoing Applications */}
+             <Card className="shadow-lg border">
+                <CardHeader>
+                    <CardTitle>Accepted / Ongoing Activities ({acceptedApplications.length})</CardTitle>
+                    <CardDescription>Manage volunteers for ongoing activities.</CardDescription>
+                </CardHeader>
+                <CardContent className="max-h-[500px] overflow-y-auto pr-2">
+                    {acceptedApplications.length > 0 ? (
+                        <div className="space-y-4">
+                            {acceptedApplications.map(app => (
+                                <Card key={app.id} className="bg-card/80 border">
+                                    <CardHeader className="pb-2">
+                                         <div className="flex flex-wrap justify-between items-start gap-2">
+                                            <div>
+                                                <CardTitle className="text-lg">{app.applicantName}</CardTitle>
+                                                <CardDescription>For: {app.opportunityTitle}</CardDescription>
+                                            </div>
+                                            <Badge variant="default" className="capitalize bg-green-600 text-white">{app.status}</Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="text-sm space-y-1 pb-3">
+                                        <p><span className="font-medium">Attendance:</span> <span className="capitalize">{app.attendance || 'Pending'}</span></p>
+                                        {app.orgRating && <p><span className="font-medium">Your Rating:</span> {app.orgRating}/5 Stars</p>}
+                                        {app.hoursLoggedByOrg !== undefined && <p><span className="font-medium">Hours Logged:</span> {app.hoursLoggedByOrg} hrs</p>}
+                                    </CardContent>
+                                    <CardFooter className="flex justify-end gap-2 pt-3 border-t">
+                                         <Dialog onOpenChange={(open) => !open && setSelectedAppForPerformance(null)}>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" size="sm" onClick={() => setSelectedAppForPerformance(app)}>
+                                                    <Edit3 className="h-4 w-4 mr-1" /> Record Performance
+                                                </Button>
+                                            </DialogTrigger>
+                                            {selectedAppForPerformance && selectedAppForPerformance.id === app.id && (
+                                                <DialogContent className="sm:max-w-[425px]">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Record Performance for {app.applicantName}</DialogTitle>
+                                                        <DialogDescription>
+                                                            Activity: {app.opportunityTitle}
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <AttendanceForm
+                                                        application={selectedAppForPerformance}
+                                                        onFormSubmit={handlePerformanceFormSubmit}
+                                                    />
+                                                </DialogContent>
+                                            )}
+                                        </Dialog>
+                                    </CardFooter>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-muted-foreground text-center py-4">No applications currently accepted.</p>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+
 
          <div className="mt-8 text-center"> {/* Adjusted margin */}
             <Button asChild variant="outline">

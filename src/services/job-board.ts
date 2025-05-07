@@ -32,8 +32,11 @@ export interface VolunteerApplication {
   applicantEmail: string;
   resumeUrl: string; // Stores Data URI of attachment
   coverLetter: string;
-  status: 'submitted' | 'accepted' | 'rejected' | 'withdrawn';
+  status: 'submitted' | 'accepted' | 'rejected' | 'withdrawn' | 'completed'; // Added 'completed' status
   submittedAt: Date | string; // Allow string during read, convert to Date
+  attendance?: 'present' | 'absent' | 'pending'; // New field for attendance
+  orgRating?: number; // New field for rating given by organization (e.g., 1-5)
+  hoursLoggedByOrg?: number; // New field for hours logged by organization
 }
 
 // File names for JSON data
@@ -59,6 +62,8 @@ async function loadApplicationsData(): Promise<VolunteerApplication[]> {
     return rawApplications.map(app => ({
         ...app,
         submittedAt: typeof app.submittedAt === 'string' ? new Date(app.submittedAt) : app.submittedAt,
+        // Ensure new optional fields are handled if they exist
+        attendance: app.attendance || 'pending',
     }));
 }
 
@@ -170,7 +175,7 @@ export async function getApplicationsForOrganization(organizationId: string): Pr
     console.log(`Returning ${applications.length} applications for organization ${organizationId}.`);
     return applications.map(app => ({
         ...app,
-        submittedAt: new Date(app.submittedAt)
+        submittedAt: app.submittedAt instanceof Date ? app.submittedAt : new Date(app.submittedAt)
     }));
 }
 
@@ -189,7 +194,7 @@ export async function getApplicationsForVolunteer(volunteerId: string): Promise<
     console.log(`Returning ${applications.length} applications for volunteer ${volunteerId}.`);
     return applications.map(app => ({
         ...app,
-        submittedAt: new Date(app.submittedAt)
+        submittedAt: app.submittedAt instanceof Date ? app.submittedAt : new Date(app.submittedAt)
     }));
 }
 
@@ -216,6 +221,7 @@ export async function submitVolunteerApplication(application: Omit<VolunteerAppl
     id: newId,
     submittedAt: new Date(), 
     status: 'submitted',
+    attendance: 'pending', // Default attendance
   };
 
   applicationsData.push(newApplication);
@@ -252,7 +258,8 @@ export async function updateApplicationStatus(
     }
 
     applicationsData[appIndex].status = status;
-    applicationsData[appIndex].submittedAt = new Date(applicationsData[appIndex].submittedAt);
+    applicationsData[appIndex].submittedAt = applicationsData[appIndex].submittedAt instanceof Date ? applicationsData[appIndex].submittedAt : new Date(applicationsData[appIndex].submittedAt);
+
 
     await writeData(APPLICATIONS_FILE, applicationsData);
 
@@ -295,7 +302,43 @@ export async function getOpportunityById(id: string): Promise<Opportunity | unde
     const opportunitiesData = await loadOpportunitiesData();
     const opportunity = opportunitiesData.find(opp => opp.id === id);
     if (opportunity && opportunity.createdAt) {
-      opportunity.createdAt = new Date(opportunity.createdAt);
+      opportunity.createdAt = opportunity.createdAt instanceof Date ? opportunity.createdAt : new Date(opportunity.createdAt);
     }
     return opportunity ? { ...opportunity } : undefined;
+}
+
+/**
+ * Updates an existing application with performance feedback from the organization.
+ * @param applicationId The ID of the application to update.
+ * @param feedbackData Object containing attendance, rating, and hours logged by org.
+ * @returns The updated volunteer application.
+ */
+export async function recordVolunteerPerformance(
+  applicationId: string,
+  feedbackData: {
+    attendance: 'present' | 'absent' | 'pending';
+    orgRating?: number;
+    hoursLoggedByOrg?: number;
+  }
+): Promise<VolunteerApplication> {
+  console.log(`Recording performance for application ${applicationId}:`, feedbackData);
+  await sleep(200);
+  let applicationsData = await loadApplicationsData();
+
+  const appIndex = applicationsData.findIndex(app => app.id === applicationId);
+  if (appIndex === -1) {
+    throw new Error('Application not found to record performance.');
+  }
+
+  // Update the application
+  applicationsData[appIndex] = {
+    ...applicationsData[appIndex],
+    ...feedbackData,
+    status: feedbackData.attendance === 'present' ? 'completed' : applicationsData[appIndex].status, // Mark as completed if present
+    submittedAt: applicationsData[appIndex].submittedAt instanceof Date ? applicationsData[appIndex].submittedAt : new Date(applicationsData[appIndex].submittedAt),
+  };
+
+  await writeData(APPLICATIONS_FILE, applicationsData);
+  console.log('Volunteer performance recorded and saved:', applicationsData[appIndex]);
+  return { ...applicationsData[appIndex] };
 }

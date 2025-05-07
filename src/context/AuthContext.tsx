@@ -16,8 +16,8 @@ import type { VolunteerStats } from '@/services/gamification';
 
 // Import server actions that will handle data persistence
 import { signInUser, signUpUser, updateUserRole, getRefreshedUserAction, updateUserProfilePictureAction } from '@/actions/auth-actions'; // Added getRefreshedUserAction, updateUserProfilePictureAction
-import { acceptVolunteerApplication, rejectVolunteerApplication, submitVolunteerApplicationAction } from '@/actions/application-actions'; // Added reject action
-import { addPointsAction, awardBadgeAction } from '@/actions/gamification-actions';
+import { acceptVolunteerApplication, rejectVolunteerApplication, submitVolunteerApplicationAction, recordVolunteerPerformanceAction } from '@/actions/application-actions'; // Added reject action, recordVolunteerPerformanceAction
+import { addPointsAction, awardBadgeAction, logHoursAction } from '@/actions/gamification-actions'; // Added logHoursAction
 import { getUserConversationsAction, startConversationAction } from '@/actions/messaging-actions'; // Added startConversationAction
 
 
@@ -43,8 +43,9 @@ interface AuthContextType {
   updateProfilePicture: (imageDataUri: string) => Promise<{ success: boolean; message: string; user?: UserProfile | null }>; // Added profile pic update
   // Application Actions
   submitApplication: (application: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>) => Promise<{ success: boolean; message: string }>;
-  acceptApplication: (applicationId: string, volunteerId: string) => Promise<{ success: boolean; message: string; conversationId?: string }>;
-  rejectApplication: (applicationId: string) => Promise<{ success: boolean; message: string }>; // Added reject signature
+  acceptApplication: (applicationId: string, volunteerId: string) => Promise<{ success: boolean; message: string; conversationId?: string, updatedApp?: VolunteerApplication | null }>; // Added updatedApp
+  rejectApplication: (applicationId: string) => Promise<{ success: boolean; message: string; updatedApp?: VolunteerApplication | null }>; // Added updatedApp
+  recordVolunteerPerformance: (applicationId: string, performanceData: { attendance: 'present' | 'absent' | 'pending'; orgRating?: number; hoursLoggedByOrg?: number; }) => Promise<{ success: boolean; message: string; updatedApplication?: VolunteerApplication | null }>;
   // Messaging Actions
   getUserConversations: () => Promise<(Conversation & { unreadCount: number })[]>;
   startConversation: (data: {
@@ -57,6 +58,7 @@ interface AuthContextType {
   // Gamification Actions
   addPoints: (userId: string, points: number, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
   awardBadge: (userId: string, badgeName: string, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
+  logHours: (userId: string, hours: number, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -285,6 +287,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
     }, [user]);
 
+    const logHoursAndUpdateContext = useCallback(async (userId: string, hours: number, reason: string): Promise<{success: boolean, newStats?: VolunteerStats | null}> => {
+        console.log(`Context: Calling logHoursAction for user ${userId}, hours: ${hours}`);
+        try {
+            const result = await logHoursAction(userId, hours, reason);
+            console.log(`Context: logHoursAction result for ${userId}:`, result);
+            if (result.success) {
+                if (user && user.id === userId && result.newStats) {
+                    console.log(`Context: Updating user state for ${userId} with new stats after logging hours:`, result.newStats);
+                    const updatedUser = { ...user, stats: result.newStats };
+                    setUser(updatedUser);
+                    sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
+                } else {
+                    console.log(`Context: User ${userId} not current user or newStats missing, not updating local state after logging hours.`);
+                }
+                return { success: true, newStats: result.newStats };
+            } else {
+                console.error(`Context: Failed to log hours: ${result.message}`);
+                return { success: false, message: result.message, newStats: null };
+            }
+        } catch (error: any) {
+            console.error(`Context: Error calling logHoursAction: ${error.message}`);
+            return { success: false, message: error.message, newStats: null };
+        }
+    }, [user]);
+
 
   // --- Feature Methods (Call Server Actions) ---
 
@@ -310,31 +337,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [user, addPointsAndUpdateContext]); // Use the renamed function
 
-  const acceptApplication = useCallback(async (applicationId: string, volunteerId: string): Promise<{ success: boolean; message: string; conversationId?: string }> => {
+  const acceptApplication = useCallback(async (applicationId: string, volunteerId: string): Promise<{ success: boolean; message: string; conversationId?: string, updatedApp?: VolunteerApplication | null }> => {
      if (!user || user.role !== 'organization') {
        return { success: false, message: 'Only logged-in organizations can accept applications.' };
      }
      setLoading(true);
      try {
-        // acceptVolunteerApplication action now handles points awarding internally
         const result = await acceptVolunteerApplication(applicationId, volunteerId, user.id, user.displayName);
         if (result.success) {
             console.log(`Context: Application ${applicationId} accepted successfully.`);
-            // Optionally trigger a refresh of the volunteer's data if needed, but points are handled server-side
-            return { success: true, message: result.message, conversationId: result.conversationId };
+            return { success: true, message: result.message, conversationId: result.conversationId, updatedApp: result.updatedApp };
         } else {
             console.error("Context: Error accepting application via action:", result.message);
-            return { success: false, message: result.message || 'Failed to accept application.' };
+            return { success: false, message: result.message || 'Failed to accept application.', updatedApp: null };
         }
      } catch (error: any) {
        console.error("Context: Error accepting application:", error);
-       return { success: false, message: error.message || 'Failed to accept application.' };
+       return { success: false, message: error.message || 'Failed to accept application.', updatedApp: null };
      } finally {
        setLoading(false);
      }
-   }, [user]); // Removed addPointsAndUpdateContext dependency
+   }, [user]);
 
-  const rejectApplication = useCallback(async (applicationId: string): Promise<{ success: boolean; message: string }> => {
+  const rejectApplication = useCallback(async (applicationId: string): Promise<{ success: boolean; message: string; updatedApp?: VolunteerApplication | null }> => {
        if (!user || user.role !== 'organization') {
            return { success: false, message: 'Only logged-in organizations can reject applications.' };
        }
@@ -343,17 +368,47 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
            const result = await rejectVolunteerApplication(applicationId);
            if (result.success) {
                console.log(`Context: Application ${applicationId} rejected successfully.`);
-               return { success: true, message: result.message };
+               return { success: true, message: result.message, updatedApp: result.updatedApp };
            } else {
                console.error("Context: Error rejecting application via action:", result.message);
-               return { success: false, message: result.message || 'Failed to reject application.' };
+               return { success: false, message: result.message || 'Failed to reject application.', updatedApp: null };
            }
        } catch (error: any) {
            console.error("Context: Error rejecting application:", error);
-           return { success: false, message: error.message || 'Failed to reject application.' };
+           return { success: false, message: error.message || 'Failed to reject application.', updatedApp: null };
        } finally {
            setLoading(false);
        }
+   }, [user]);
+
+   const recordVolunteerPerformance = useCallback(async (
+        applicationId: string,
+        performanceData: {
+            attendance: 'present' | 'absent' | 'pending';
+            orgRating?: number;
+            hoursLoggedByOrg?: number;
+        }
+    ): Promise<{ success: boolean; message: string; updatedApplication?: VolunteerApplication | null }> => {
+        if (!user || user.role !== 'organization') {
+            return { success: false, message: 'Only organizations can record performance.' };
+        }
+        setLoading(true);
+        try {
+            const result = await recordVolunteerPerformanceAction(applicationId, performanceData);
+            if (result.success && result.updatedApplication) {
+                 // If current user is the volunteer whose stats might have changed, refresh their data.
+                 // This is a bit indirect; ideally, gamification actions would return the volunteer's ID
+                 // or we'd fetch the volunteer's full profile after this.
+                 // For now, we rely on the volunteer's dashboard to fetch fresh stats.
+                console.log('Performance recorded, volunteer stats may have been updated on server.');
+            }
+            return result;
+        } catch (error: any) {
+            console.error("Context: Record performance error -", error);
+            return { success: false, message: error.message || 'Failed to record performance.', updatedApplication: null };
+        } finally {
+            setLoading(false);
+        }
    }, [user]);
 
     const getUserConversations = useCallback(async (): Promise<(Conversation & { unreadCount: number })[]> => {
@@ -434,10 +489,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         submitApplication,
         acceptApplication,
         rejectApplication, // Add rejectApplication to context value
+        recordVolunteerPerformance,
         getUserConversations,
         startConversation, // Add startConversation to context value
         addPoints: addPointsAndUpdateContext, // Expose the renamed function as 'addPoints'
         awardBadge: awardBadgeAndUpdateContext, // Expose the renamed function as 'awardBadge'
+        logHours: logHoursAndUpdateContext, // Expose logHours
      }}>
       {children}
     </AuthContext.Provider>

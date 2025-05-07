@@ -5,13 +5,14 @@
 import {
     submitVolunteerApplication as submitAppService,
     updateApplicationStatus as updateAppStatusService,
-    getOpportunityById // Needed to award correct points
+    getOpportunityById, // Needed to award correct points
+    recordVolunteerPerformance // Import new service function
 } from '@/services/job-board';
 import { createConversation as createConversationService } from '@/services/messaging';
 import { createNotification } from '@/services/notification'; // Import notification service
 import type { VolunteerApplication, Opportunity } from '@/services/job-board';
 import type { Conversation } from '@/services/messaging'; // Import Conversation type
-import { addPointsAction } from './gamification-actions'; // Import gamification action
+import { addPointsAction, logHoursAction } from './gamification-actions'; // Import gamification actions
 
 
 /**
@@ -30,6 +31,7 @@ export async function submitVolunteerApplicationAction(
             volunteerId: volunteerId,
             applicantName: applicantName, // Ensure name from context is used
             status: 'submitted', // Explicitly set status
+            attendance: 'pending', // Default attendance
         });
 
         // Note: Points are awarded in the AuthContext after this action succeeds
@@ -68,17 +70,11 @@ export async function acceptVolunteerApplication(
            initialMessage: `Congratulations! Your application for "${updatedApp.opportunityTitle}" has been accepted. Let's coordinate next steps.`,
         });
 
-        // 3. Award points (call the action directly)
-        let pointsToAward = 50; // Default acceptance points
-        try {
-            const opportunity = await getOpportunityById(updatedApp.opportunityId);
-            if (opportunity && opportunity.pointsAwarded) {
-                pointsToAward = opportunity.pointsAwarded;
-            }
-        } catch (e) {
-            console.warn("Could not fetch opportunity details for points, using default.")
-        }
-        await addPointsAction(volunteerId, pointsToAward, `Accepted for opportunity: ${updatedApp.opportunityTitle}`);
+        // 3. Award points for acceptance (if different from completion points)
+        // Let's assume pointsAwarded on opportunity is for completion.
+        // We can define separate acceptance points if needed, e.g., 10 points.
+        await addPointsAction(volunteerId, 10, `Application accepted for: ${updatedApp.opportunityTitle}`);
+
 
         // 4. Create Notification for the volunteer
         const notificationMessage = `Your application for "${updatedApp.opportunityTitle}" has been accepted!`;
@@ -88,7 +84,6 @@ export async function acceptVolunteerApplication(
         return { success: true, message: 'Application accepted, conversation started, and notification sent.', conversationId: conversation.id, updatedApp: updatedApp };
     } catch (error: any) {
         console.error("Server Action: Accept application error -", error);
-        // Consider rolling back status update if conversation/notification creation fails? (More complex)
         return { success: false, message: error.message || 'Failed to accept application.', updatedApp: null };
     }
 }
@@ -116,4 +111,66 @@ export async function rejectVolunteerApplication(
         console.error("Server Action: Reject application error -", error);
         return { success: false, message: error.message || 'Failed to reject application.', updatedApp: null };
      }
+}
+
+
+/**
+ * Server action for an organization to record a volunteer's performance for an application/activity.
+ * Updates the application with attendance, rating, and hours.
+ * If attended, awards points and logs hours for the volunteer.
+ */
+export async function recordVolunteerPerformanceAction(
+  applicationId: string,
+  performanceData: {
+    attendance: 'present' | 'absent' | 'pending';
+    orgRating?: number; // 1-5
+    hoursLoggedByOrg?: number;
+  }
+): Promise<{ success: boolean; message: string; updatedApplication?: VolunteerApplication | null }> {
+  console.log(`Server Action: Recording performance for application ${applicationId}`, performanceData);
+  try {
+    // Step 1: Update the application with performance data
+    const updatedApp = await recordVolunteerPerformance(applicationId, performanceData);
+
+    if (!updatedApp) {
+      return { success: false, message: "Failed to update application with performance data.", updatedApplication: null };
+    }
+
+    // Step 2: If volunteer was present, trigger gamification
+    if (performanceData.attendance === 'present') {
+      const opportunity = await getOpportunityById(updatedApp.opportunityId);
+      if (!opportunity) {
+        console.warn(`Server Action: Opportunity ${updatedApp.opportunityId} not found for gamification updates.`);
+        // Proceed without opportunity-specific points if not found, but log hours.
+      }
+
+      // Award points for completing the opportunity
+      const completionPoints = opportunity?.pointsAwarded || 0; // Default to 0 if not defined
+      if (completionPoints > 0) {
+        await addPointsAction(updatedApp.volunteerId, completionPoints, `Completed: ${updatedApp.opportunityTitle}`);
+      }
+
+      // Award bonus points for high rating
+      if (performanceData.orgRating && performanceData.orgRating >= 4) {
+        const ratingBonusPoints = performanceData.orgRating === 5 ? 20 : 10; // Example: 20 for 5-star, 10 for 4-star
+        await addPointsAction(updatedApp.volunteerId, ratingBonusPoints, `Received ${performanceData.orgRating}-star rating for: ${updatedApp.opportunityTitle}`);
+      }
+
+      // Log hours
+      if (performanceData.hoursLoggedByOrg && performanceData.hoursLoggedByOrg > 0) {
+        await logHoursAction(updatedApp.volunteerId, performanceData.hoursLoggedByOrg, `Volunteered for: ${updatedApp.opportunityTitle}`);
+      }
+
+       // Create Notification for the volunteer
+       const notificationMessage = `Your participation for "${updatedApp.opportunityTitle}" has been recorded. Thank you!`;
+       const notificationLink = `/dashboard/volunteer`; // Link to their dashboard
+       await createNotification(updatedApp.volunteerId, notificationMessage, notificationLink);
+    }
+
+    return { success: true, message: "Volunteer performance recorded successfully.", updatedApplication: updatedApp };
+
+  } catch (error: any) {
+    console.error("Server Action: Record volunteer performance error -", error);
+    return { success: false, message: error.message || 'Failed to record volunteer performance.', updatedApplication: null };
+  }
 }
