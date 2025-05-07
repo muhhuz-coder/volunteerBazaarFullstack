@@ -19,19 +19,20 @@ export function ChatbotWidget() {
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
+        {/* Button is now fixed at the bottom right */}
         <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-9 w-9 rounded-full hover:bg-primary-foreground/10"
+          variant="default" // Use default for better visibility
+          size="lg" // Make button larger
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-accent hover:bg-accent/90 text-accent-foreground"
           aria-label="Open chatbot"
         >
-          <MessageCircle className="h-5 w-5" />
+          <MessageCircle className="h-7 w-7" /> {/* Larger icon */}
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        side="bottom" // Changed from "top" as it's now in the header
-        align="end"
-        sideOffset={8} 
+        side="top" // Open above the button
+        align="end" // Align to the right of the button
+        sideOffset={12} // Increased offset from the button
         className="w-[300px] h-[450px] sm:w-[380px] sm:h-[550px] p-0 border-0 shadow-2xl rounded-lg z-50 flex flex-col"
         onOpenAutoFocus={(e) => e.preventDefault()} 
       >

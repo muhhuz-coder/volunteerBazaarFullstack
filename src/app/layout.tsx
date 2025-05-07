@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans'; // Import Geist Sans
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster'; // Import Toaster
 import { AuthProvider } from '@/context/AuthContext'; // Import AuthProvider
+import { ChatbotWidget } from '@/components/chatbot-widget'; // Import ChatbotWidget
 
 // No need for Inter anymore if GeistSans is primary
 
@@ -28,7 +29,7 @@ export default function RootLayout({
             {children}
           </main>
           <Toaster /> {/* Add Toaster component */}
-          {/* ChatbotWidget is now part of Header and positions itself fixed */}
+          <ChatbotWidget /> {/* Add ChatbotWidget here for global fixed positioning */}
         </AuthProvider>
       </body>
     </html>

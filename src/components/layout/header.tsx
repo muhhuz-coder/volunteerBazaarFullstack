@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 // Updated icons and added Bell for Notifications, MessageCircle for Chatbot
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, MessageCircle, Users } from 'lucide-react'; // Added Users for Volunteers
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, Users } from 'lucide-react'; // Added Users for Volunteers
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +26,7 @@ import { Menu } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { NotificationDropdown } from '@/components/layout/notification-dropdown';
-import { ChatbotWidget } from '@/components/chatbot-widget';
+// ChatbotWidget is removed from here
 
 
 export function Header() {
@@ -91,9 +91,8 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2 md:gap-3"> {/* Adjusted gap for consistency */}
-          {/* Chatbot Widget (Visible on all screen sizes, styled to fit header) */}
-          <ChatbotWidget />
-
+          {/* Chatbot Widget is now globally positioned from RootLayout */}
+          
           {/* Notifications (Visible only when logged in) */}
           {user && !loading && <NotificationDropdown />}
           
@@ -252,7 +251,6 @@ export function Header() {
           </div>
         </div>
       </div>
-      {/* ChatbotWidget is now rendered as a fixed element at the bottom right by its own styling */}
     </header>
   );
 }
