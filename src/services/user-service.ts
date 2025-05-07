@@ -4,36 +4,45 @@
 import { readData, objectToMap } from '@/lib/db-utils';
 import type { UserProfile } from '@/context/AuthContext';
 import type { VolunteerStats } from '@/services/gamification'; // Import for stats typing
+import { getUserStats as fetchVolunteerStats } from '@/services/gamification'; // Import the service function
 
 const USERS_FILE = 'users.json';
-// const USER_STATS_FILE = 'user-stats.json'; // User stats are part of UserProfile in users.json
+// USER_STATS_FILE is managed by gamification service
 
 // Simulate API delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Loads all user profiles from the users.json file.
- * Ensures volunteer stats are merged and defaulted if necessary.
+ * For volunteers, it fetches their latest stats from the gamification service.
  */
 async function getAllUsersWithStats(): Promise<UserProfile[]> {
     const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
     const usersMap = objectToMap(usersObject);
     
-    const allUsers: UserProfile[] = [];
-    for (const user of usersMap.values()) {
-        let userWithStats = { ...user }; // Shallow copy of user
+    const allUsersWithLiveStats: UserProfile[] = [];
+
+    for (const basicProfile of usersMap.values()) {
+        let userWithStats = { ...basicProfile }; // Shallow copy of user
 
         if (userWithStats.role === 'volunteer') {
-            const existingStats = userWithStats.stats || {}; // Handle undefined/null stats
-            userWithStats.stats = {
-                points: existingStats.points ?? 0,
-                badges: Array.isArray(existingStats.badges) ? [...existingStats.badges] : [], // Ensure badges is an array and copied
-                hours: existingStats.hours ?? 0,
-            };
+            try {
+                // Fetch live stats from the gamification service
+                const liveStats = await fetchVolunteerStats(userWithStats.id);
+                userWithStats.stats = liveStats;
+            } catch (error) {
+                console.error(`Failed to fetch stats for volunteer ${userWithStats.id}:`, error);
+                // Default stats if fetching fails, to prevent breaking the list
+                userWithStats.stats = {
+                    points: 0,
+                    badges: [],
+                    hours: 0,
+                };
+            }
         }
-        allUsers.push(userWithStats);
+        allUsersWithLiveStats.push(userWithStats);
     }
-    return allUsers;
+    return allUsersWithLiveStats;
 }
 
 /**
@@ -46,9 +55,9 @@ export async function getPublicVolunteers(filters?: {
   sortBy?: string; // e.g., 'points_desc', 'name_asc', 'hours_desc'
 }): Promise<UserProfile[]> {
   await sleep(150); // Simulate delay
-  let users = await getAllUsersWithStats();
+  let users = await getAllUsersWithStats(); // This now fetches live stats for volunteers
 
-  // Filter for volunteers
+  // Filter for volunteers (though getAllUsersWithStats focuses on enriching volunteers, an explicit filter is safer)
   let volunteers = users.filter(user => user.role === 'volunteer');
 
   // Apply keyword filter (search displayName)
@@ -84,13 +93,15 @@ export async function getPublicVolunteers(filters?: {
     volunteers.sort((a, b) => (b.stats?.points ?? 0) - (a.stats?.points ?? 0));
   }
 
-  console.log(`Returning ${volunteers.length} public volunteer profiles.`);
-  // Return copies of user profiles with stats ensured to be copied as well
+  console.log(`Returning ${volunteers.length} public volunteer profiles with up-to-date stats.`);
+  // Return copies of user profiles. Stats are already up-to-date from getAllUsersWithStats.
   return volunteers.map(v => ({
     ...v,
-    // Since getAllUsersWithStats ensures stats object and its fields are initialized for volunteers,
-    // we can confidently spread it. We also ensure badges array is a new copy.
-    stats: v.stats ? { ...v.stats, badges: [...v.stats.badges] } : { points: 0, badges: [], hours: 0 }
+    // Ensure stats object and its badges array are properly copied if they exist
+    stats: v.stats 
+        ? { ...v.stats, badges: Array.isArray(v.stats.badges) ? [...v.stats.badges] : [] } 
+        : { points: 0, badges: [], hours: 0 }
   }));
 }
 
+```
