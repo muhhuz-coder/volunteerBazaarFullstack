@@ -28,6 +28,7 @@ export default function RootLayout({
             {children}
           </main>
           <Toaster /> {/* Add Toaster component */}
+          {/* ChatbotWidget is now part of Header and positions itself fixed */}
         </AuthProvider>
       </body>
     </html>

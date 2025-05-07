@@ -1,4 +1,3 @@
-
 // src/components/layout/header.tsx
 'use client';
 
@@ -27,6 +26,8 @@ import { Menu } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { NotificationDropdown } from '@/components/layout/notification-dropdown'; // Import NotificationDropdown
+import { ChatbotWidget } from '@/components/chatbot-widget'; // Import ChatbotWidget
+
 
 export function Header() {
   const { user, loading, signOut, role, stats: userStats } = useAuth();
@@ -47,22 +48,22 @@ export function Header() {
                       : '/select-role';
 
    // Add icons to base links, including Chatbot
+   // Removed /analytics link as it's integrated into homepage
    const baseNavLinks = [
-     { href: "/", label: "Opportunities", icon: Search },
+     { href: "/", label: "Home", icon: Search }, // Changed "Opportunities" to "Home"
      { href: "/about", label: "About Us", icon: Info },
      { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
      { href: "/contact", label: "Contact", icon: Mail },
-     { href: "/analytics", label: "Analytics", icon: BarChart3 },
-     { href: "/chatbot", label: "Chatbot", icon: MessageCircle }, // Added Chatbot link
+     // { href: "/analytics", label: "Analytics", icon: BarChart3 }, // Removed dedicated analytics link
+     { href: "/chatbot", label: "Chatbot Page", icon: MessageCircle }, // Renamed for clarity from widget
    ];
 
    // Ensure user-specific links also have icons if needed
    const navLinks = user
      ? [
-         ...baseNavLinks.filter(link => link.href !== '/analytics' && link.href !== '/contact'), // Keep Opportunities, About, How It Works, Chatbot
+         ...baseNavLinks.filter(link => link.href !== '/contact' && link.href !== '/chatbot'), // Remove chatbot page if widget exists
          { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
          { href: "/contact", label: "Contact", icon: Mail }, // Add contact back for logged in users
-         { href: "/analytics", label: "Analytics", icon: BarChart3 },
        ]
      : baseNavLinks;
 
@@ -93,6 +94,11 @@ export function Header() {
         <div className="flex items-center gap-3">
           {/* Notifications (Visible only when logged in) */}
           {user && !loading && <NotificationDropdown />}
+          
+          {/* Chatbot Widget (Always visible for now, or conditionally) */}
+          {/* The ChatbotWidget is a floating button, so it's not placed directly in the header flow */}
+          {/* <ChatbotWidget />  This line might be removed if ChatbotWidget positions itself fixed */}
+
 
           {/* Auth Section */}
           {loading ? (
@@ -252,6 +258,8 @@ export function Header() {
           </div>
         </div>
       </div>
+      {/* The ChatbotWidget positions itself as fixed, so it's placed outside the direct header flow for layout purposes */}
+      <ChatbotWidget />
     </header>
   );
 }

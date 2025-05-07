@@ -8,7 +8,7 @@ import Image from 'next/image';
 import type { Opportunity } from '@/services/job-board';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, ImageOff, Star, Eye, Briefcase, LayoutGrid, List, Users, Handshake } from 'lucide-react'; // Added ShieldCheck, Users, Handshake
+import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, Briefcase, LayoutGrid, List, Users, Handshake, Star, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -36,7 +36,7 @@ interface OpportunityListProps {
   category?: string;
   location?: string;
   commitment?: string;
-  currentView?: 'grid' | 'list';
+  currentView?: 'grid' | 'list'; // 'grid' is horizontal scroll, 'list' is vertical
   currentSort?: string;
 }
 
@@ -44,12 +44,11 @@ const sortOptions = [
   { value: 'recent', label: 'Most Recent' },
   { value: 'title_asc', label: 'Title (A-Z)' },
   { value: 'title_desc', label: 'Title (Z-A)' },
-  // Add more sort options as needed, e.g., by points, by organization
 ];
 
 export function OpportunityList({
   initialOpportunities,
-  currentView = 'grid',
+  currentView = 'grid', // Default to horizontal scroll
   currentSort = 'recent',
 }: OpportunityListProps) {
   const opportunities = initialOpportunities;
@@ -84,7 +83,7 @@ export function OpportunityList({
       return;
     }
     setCurrentOpportunityForDialog(opportunity);
-    setMessageContent(''); // Reset message content
+    setMessageContent('');
     setShowContactDialog(true);
   };
 
@@ -133,11 +132,12 @@ export function OpportunityList({
   const OpportunityCard = ({ opportunity }: { opportunity: Opportunity }) => (
     <Card className={cn(
         "flex group overflow-hidden transition-all duration-300 ease-in-out border",
-        currentView === 'grid' ? 'flex-col card-hover-effect' : 'flex-row items-start hover:shadow-lg bg-card' // Ensure bg-card for list view too
+        currentView === 'grid' 
+            ? 'flex-col card-hover-effect min-w-[300px] w-[300px] md:min-w-[320px] md:w-[320px] scroll-snap-align-start' 
+            : 'flex-row items-start hover:shadow-lg bg-card'
     )}>
-      {/* Image Section */}
       <div className={cn(
-          "relative bg-muted/50 flex-shrink-0", // Slightly lighter muted for image placeholder
+          "relative bg-muted/50 flex-shrink-0",
           currentView === 'grid' ? 'h-48 w-full' : 'h-full w-1/3 md:w-1/4'
       )}>
         {opportunity.imageUrl && (opportunity.imageUrl.startsWith('data:image') || opportunity.imageUrl.startsWith('http')) ? (
@@ -161,7 +161,6 @@ export function OpportunityList({
          )}
       </div>
 
-      {/* Main Content Section */}
       <div className={cn("flex flex-col flex-grow", currentView === 'grid' ? 'p-4' : 'p-4 w-2/3 md:w-1/2')}>
         <CardHeader className="p-0 pb-2">
           <CardTitle className="text-lg md:text-xl font-semibold text-primary group-hover:text-accent transition-colors duration-200 line-clamp-2">
@@ -188,7 +187,7 @@ export function OpportunityList({
           <p className="text-foreground/90 line-clamp-2 pt-2 text-xs leading-relaxed">{opportunity.description}</p>
         </CardContent>
 
-        {currentView === 'grid' && (
+        {currentView === 'grid' && ( // Footer for horizontal grid cards
           <CardFooter className="p-0 pt-3 flex flex-wrap gap-2 justify-between items-center border-t mt-3">
             <Button asChild variant="link" className="text-accent p-0 h-auto font-medium group-hover:underline text-sm">
               <Link href={`/apply/${opportunity.id}`} className="flex items-center gap-1">
@@ -196,16 +195,48 @@ export function OpportunityList({
               </Link>
             </Button>
             {user && role === 'volunteer' && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" title="Contact Organization" onClick={() => openContactDialog(opportunity)}>
-                    {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
-                  </Button>
+                 <AlertDialog>
+                   <AlertDialogTrigger asChild>
+                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" title="Contact Organization">
+                       {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                     </Button>
+                   </AlertDialogTrigger>
+                   <AlertDialogContent>
+                     <AlertDialogHeader>
+                       <AlertDialogTitle>Contact {opportunity.organization}</AlertDialogTitle>
+                       <AlertDialogDescription>
+                         Send a message regarding "{opportunity.title}".
+                         Your name ({user?.displayName}) and email will be shared.
+                       </AlertDialogDescription>
+                     </AlertDialogHeader>
+                     <Textarea
+                       placeholder="Type your message here..."
+                       value={messageContent}
+                       onChange={(e) => setMessageContent(e.target.value)}
+                       className="min-h-[120px] bg-background"
+                     />
+                     <AlertDialogFooter>
+                       <AlertDialogCancel onClick={() => setCurrentOpportunityForDialog(null)}>Cancel</AlertDialogCancel>
+                       <AlertDialogAction
+                         onClick={() => handleContactOrganization()} // Ensure currentOpportunityForDialog is set before this is called
+                         disabled={!messageContent.trim() || contactingOrgId === opportunity.id}
+                         className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                       >
+                         {contactingOrgId === opportunity.id ? (
+                           <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending... </>
+                         ) : (
+                           'Send Message'
+                         )}
+                       </AlertDialogAction>
+                     </AlertDialogFooter>
+                   </AlertDialogContent>
+                 </AlertDialog>
             )}
           </CardFooter>
         )}
       </div>
 
-      {/* Right Stats Panel (Inspired by MILKAR, for List View) */}
-      {currentView === 'list' && (
+      {currentView === 'list' && ( // Stats panel for vertical list view
         <div className="w-full md:w-1/4 p-4 border-l flex-shrink-0 space-y-3 bg-card/50 md:bg-transparent">
           {opportunity.pointsAwarded && opportunity.pointsAwarded > 0 && (
             <div className="text-xs">
@@ -229,10 +260,43 @@ export function OpportunityList({
             </Link>
           </Button>
            {user && role === 'volunteer' && (
-                <Button variant="outline" size="sm" className="w-full mt-1.5" onClick={() => openContactDialog(opportunity)} disabled={contactingOrgId === opportunity.id}>
-                  {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1.5" />}
-                   Contact Org
-                </Button>
+                 <AlertDialog>
+                   <AlertDialogTrigger asChild>
+                     <Button variant="outline" size="sm" className="w-full mt-1.5" disabled={contactingOrgId === opportunity.id}>
+                       {contactingOrgId === opportunity.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1.5" />}
+                        Contact Org
+                     </Button>
+                   </AlertDialogTrigger>
+                   <AlertDialogContent>
+                     <AlertDialogHeader>
+                       <AlertDialogTitle>Contact {opportunity.organization}</AlertDialogTitle>
+                       <AlertDialogDescription>
+                         Send a message regarding "{opportunity.title}".
+                         Your name ({user?.displayName}) and email will be shared.
+                       </AlertDialogDescription>
+                     </AlertDialogHeader>
+                     <Textarea
+                       placeholder="Type your message here..."
+                       value={messageContent}
+                       onChange={(e) => setMessageContent(e.target.value)}
+                       className="min-h-[120px] bg-background"
+                     />
+                     <AlertDialogFooter>
+                       <AlertDialogCancel onClick={() => setCurrentOpportunityForDialog(null)}>Cancel</AlertDialogCancel>
+                       <AlertDialogAction
+                         onClick={() => handleContactOrganization()} // Ensure currentOpportunityForDialog is set
+                         disabled={!messageContent.trim() || contactingOrgId === opportunity.id}
+                         className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                       >
+                         {contactingOrgId === opportunity.id ? (
+                           <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending... </>
+                         ) : (
+                           'Send Message'
+                         )}
+                       </AlertDialogAction>
+                     </AlertDialogFooter>
+                   </AlertDialogContent>
+                 </AlertDialog>
             )}
         </div>
       )}
@@ -241,7 +305,6 @@ export function OpportunityList({
 
   return (
     <>
-      {/* Sort and View Toggle Controls */}
       <div className="mb-6 flex flex-wrap gap-2 justify-end items-center">
         <Select value={currentSort} onValueChange={handleSortChange}>
           <SelectTrigger className="w-auto md:w-[180px] h-9 text-sm bg-card border-border shadow-sm">
@@ -261,7 +324,7 @@ export function OpportunityList({
             size="sm"
             onClick={() => handleViewChange('grid')}
             className={cn("h-8 px-3", currentView === 'grid' ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground hover:bg-muted/50')}
-            aria-label="Grid view"
+            aria-label="Horizontal scroll view"
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>
@@ -277,25 +340,31 @@ export function OpportunityList({
         </div>
       </div>
 
-      <div className={`grid gap-6 ${currentView === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
-        {opportunities.map((opportunity) => (
-          <OpportunityCard key={opportunity.id} opportunity={opportunity} />
-        ))}
-      </div>
+      {currentView === 'grid' ? (
+        <div className="flex overflow-x-auto space-x-4 pb-4 scroll-smooth scroll-snap-x-mandatory">
+          {opportunities.map((opportunity) => (
+            <OpportunityCard key={opportunity.id} opportunity={opportunity} />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6">
+          {opportunities.map((opportunity) => (
+            <OpportunityCard key={opportunity.id} opportunity={opportunity} />
+          ))}
+        </div>
+      )}
 
-      {/* Contact Dialog */}
-      {currentOpportunityForDialog && (
+      {/* Contact Dialog: Placed here to be available for any card that triggers it */}
+      {currentOpportunityForDialog && user && ( // Ensure user is available for dialog content
         <AlertDialog open={showContactDialog} onOpenChange={setShowContactDialog}>
-          <AlertDialogTrigger asChild>
-            {/* This trigger is now implicitly handled by openContactDialog */}
-            <VisuallyHidden><Button>Open Dialog</Button></VisuallyHidden>
-          </AlertDialogTrigger>
+          {/* The AlertDialogTrigger is handled programmatically by openContactDialog */}
+          <VisuallyHidden><AlertDialogTrigger asChild><Button>Open Dialog</Button></AlertDialogTrigger></VisuallyHidden>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Contact {currentOpportunityForDialog.organization}</AlertDialogTitle>
               <AlertDialogDescription>
                 Send a message regarding "{currentOpportunityForDialog.title}".
-                Your name ({user?.displayName}) and email will be shared.
+                Your name ({user.displayName}) and email will be shared.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <Textarea
@@ -305,7 +374,7 @@ export function OpportunityList({
               className="min-h-[120px] bg-background"
             />
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setShowContactDialog(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleContactOrganization}
                 disabled={!messageContent.trim() || contactingOrgId === currentOpportunityForDialog.id}
@@ -324,3 +393,5 @@ export function OpportunityList({
     </>
   );
 }
+
+    
