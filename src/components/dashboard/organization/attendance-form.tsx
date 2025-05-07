@@ -47,7 +47,7 @@ export function AttendanceForm({ application, onFormSubmit }: AttendanceFormProp
     defaultValues: {
       attendance: application.attendance || 'pending',
       orgRating: application.orgRating || undefined,
-      hoursLoggedByOrg: application.hoursLoggedByOrg === null ? undefined : application.hoursLoggedByOrg, // Ensure null becomes undefined
+      hoursLoggedByOrg: application.hoursLoggedByOrg === null || application.hoursLoggedByOrg === undefined ? undefined : application.hoursLoggedByOrg,
     },
   });
 
@@ -124,16 +124,15 @@ export function AttendanceForm({ application, onFormSubmit }: AttendanceFormProp
             <FormItem>
               <FormLabel className="flex items-center gap-2"><Star className="h-4 w-4" /> Volunteer Rating (1-5, Optional)</FormLabel>
               <FormControl>
-                <Select 
-                  onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
-                  defaultValue={field.value?.toString()}
-                  value={field.value?.toString() ?? ""} // Ensure value is controlled
+                <Select
+                  onValueChange={(value) => field.onChange(value !== "none" ? parseInt(value) : undefined)}
+                  value={field.value?.toString() ?? "none"} // Use "none" for undefined field value
                 >
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder="Rate volunteer performance" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Rating</SelectItem> 
+                    <SelectItem value="none">No Rating</SelectItem>
                     {[1, 2, 3, 4, 5].map(num => (
                       <SelectItem key={num} value={num.toString()}>{num} Star{num > 1 ? 's' : ''}</SelectItem>
                     ))}
@@ -155,14 +154,14 @@ export function AttendanceForm({ application, onFormSubmit }: AttendanceFormProp
                 <Input
                   type="number"
                   placeholder="e.g., 3.5"
-                  value={field.value ?? ''} // Use empty string if field.value is undefined or null
+                  value={field.value ?? ''}
                   onChange={e => {
                     const rawValue = e.target.value;
                     if (rawValue === '') {
-                      field.onChange(undefined); // Set to undefined if input is empty
+                      field.onChange(undefined); 
                     } else {
                       const num = parseFloat(rawValue);
-                      field.onChange(isNaN(num) ? undefined : num); // Set to number or undefined if NaN
+                      field.onChange(isNaN(num) ? undefined : num); 
                     }
                   }}
                   onBlur={field.onBlur}
