@@ -17,6 +17,7 @@ export interface Opportunity {
   category: string;
   pointsAwarded?: number; // Optional points awarded upon completion/acceptance
   imageUrl?: string; // Optional image for the opportunity (Data URI)
+  createdAt?: Date | string; // Optional: Timestamp for when opportunity was created for sorting
 }
 
 /**
@@ -47,9 +48,10 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function loadOpportunitiesData(): Promise<Opportunity[]> {
     const opportunities = await readData<Opportunity[]>(OPPORTUNITIES_FILE, []);
-    // Ensure pointsAwarded exists or set a default (e.g., 0 or undefined) if needed
-    // For now, assume data structure is consistent or handle missing fields during use
-    return opportunities;
+    return opportunities.map(opp => ({
+        ...opp,
+        createdAt: opp.createdAt ? new Date(opp.createdAt) : new Date(0) // Default to epoch if not present
+    }));
 }
 
 async function loadApplicationsData(): Promise<VolunteerApplication[]> {
@@ -66,18 +68,25 @@ async function loadApplicationsData(): Promise<VolunteerApplication[]> {
  * Reads from the loaded data and simulates filtering.
  * @param keywords Keywords to search for in opportunity titles or descriptions.
  * @param category Category to filter opportunities.
+ * @param location Location to filter opportunities.
+ * @param commitment Commitment type to filter opportunities.
+ * @param sort Sorting criteria.
  * @returns A promise that resolves to an array of Opportunity objects.
  */
-export async function getOpportunities(keywords?: string, category?: string): Promise<Opportunity[]> {
-  console.log(`Fetching opportunities with keywords: "${keywords}" and category: "${category}"`);
-  await sleep(100); // Simulate minimal delay
-  const opportunitiesData = await loadOpportunitiesData();
-
-  let filteredOpportunities = opportunitiesData;
+export async function getOpportunities(
+    keywords?: string,
+    category?: string,
+    location?: string,
+    commitment?: string,
+    sort: string = 'recent' // Default sort by recent
+): Promise<Opportunity[]> {
+  console.log(`Fetching opportunities with keywords: "${keywords}", category: "${category}", location: "${location}", commitment: "${commitment}", sort: "${sort}"`);
+  await sleep(100); 
+  let opportunitiesData = await loadOpportunitiesData();
 
   if (keywords) {
     const lowerKeywords = keywords.toLowerCase();
-    filteredOpportunities = filteredOpportunities.filter(opp =>
+    opportunitiesData = opportunitiesData.filter(opp =>
       opp.title.toLowerCase().includes(lowerKeywords) ||
       opp.organization.toLowerCase().includes(lowerKeywords) ||
       opp.description.toLowerCase().includes(lowerKeywords)
@@ -85,11 +94,37 @@ export async function getOpportunities(keywords?: string, category?: string): Pr
   }
 
   if (category && category !== 'All') {
-     filteredOpportunities = filteredOpportunities.filter(opp => opp.category === category);
+     opportunitiesData = opportunitiesData.filter(opp => opp.category === category);
   }
 
-  console.log(`Returning ${filteredOpportunities.length} opportunities.`);
-  return [...filteredOpportunities]; // Return a copy
+  if (location) {
+    const lowerLocation = location.toLowerCase();
+    // Simple string inclusion for location. Could be more advanced (e.g., specific city/province match).
+    opportunitiesData = opportunitiesData.filter(opp => opp.location.toLowerCase().includes(lowerLocation));
+  }
+
+  if (commitment && commitment !== 'All') {
+    // Simple string inclusion for commitment.
+    opportunitiesData = opportunitiesData.filter(opp => opp.commitment.toLowerCase().includes(commitment.toLowerCase()));
+  }
+
+  // Sorting logic
+  switch (sort) {
+    case 'title_asc':
+      opportunitiesData.sort((a, b) => a.title.localeCompare(b.title));
+      break;
+    case 'title_desc':
+      opportunitiesData.sort((a, b) => b.title.localeCompare(a.title));
+      break;
+    case 'recent': // Default sort by createdAt descending (newest first)
+    default:
+      opportunitiesData.sort((a, b) => (b.createdAt as Date).getTime() - (a.createdAt as Date).getTime());
+      break;
+  }
+
+
+  console.log(`Returning ${opportunitiesData.length} opportunities.`);
+  return [...opportunitiesData]; // Return a copy
 }
 
 /**
@@ -99,22 +134,19 @@ export async function getOpportunities(keywords?: string, category?: string): Pr
  */
 export async function getApplicationsForOrganization(organizationId: string): Promise<VolunteerApplication[]> {
     console.log(`Fetching applications for organization ID: ${organizationId}`);
-    await sleep(100); // Simulate minimal delay
+    await sleep(100);
     const opportunitiesData = await loadOpportunitiesData();
     const applicationsData = await loadApplicationsData();
 
-    // Find opportunities belonging to this organization first
     const orgOpportunityIds = opportunitiesData
         .filter(opp => opp.organizationId === organizationId)
         .map(opp => opp.id);
 
-    // Filter applications that belong to those opportunities
     const applications = applicationsData.filter(app => orgOpportunityIds.includes(app.opportunityId));
-
 
     console.log(`Returning ${applications.length} applications for organization ${organizationId}.`);
     return applications.map(app => ({
-        ...app, // Return copies with Date objects
+        ...app,
         submittedAt: new Date(app.submittedAt)
     }));
 }
@@ -126,14 +158,14 @@ export async function getApplicationsForOrganization(organizationId: string): Pr
  */
 export async function getApplicationsForVolunteer(volunteerId: string): Promise<VolunteerApplication[]> {
     console.log(`Fetching applications for volunteer ID: ${volunteerId}`);
-    await sleep(100); // Simulate minimal delay
+    await sleep(100);
     const applicationsData = await loadApplicationsData();
 
     const applications = applicationsData.filter(app => app.volunteerId === volunteerId);
 
     console.log(`Returning ${applications.length} applications for volunteer ${volunteerId}.`);
     return applications.map(app => ({
-        ...app, // Return copies with Date objects
+        ...app,
         submittedAt: new Date(app.submittedAt)
     }));
 }
@@ -148,29 +180,26 @@ export async function getApplicationsForVolunteer(volunteerId: string): Promise<
  */
 export async function submitVolunteerApplication(application: Omit<VolunteerApplication, 'id'>): Promise<string> {
   console.log('Submitting volunteer application:', application);
-  await sleep(500); // Simulate network delay for submission
-  let applicationsData = await loadApplicationsData(); // Load current data
+  await sleep(500);
+  let applicationsData = await loadApplicationsData(); 
 
-  if (Math.random() < 0.05) { // Simulate occasional failure
+  if (Math.random() < 0.05) { 
      throw new Error('Simulated network error during submission.');
   }
 
-  // Generate a simple ID
   const newId = `app-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   const newApplication: VolunteerApplication = {
     ...application,
     id: newId,
-    submittedAt: new Date(), // Record submission time
-    status: 'submitted', // Ensure status is set correctly
+    submittedAt: new Date(), 
+    status: 'submitted',
   };
 
-  // Update data and write to file
   applicationsData.push(newApplication);
   await writeData(APPLICATIONS_FILE, applicationsData);
 
   console.log('Application added and saved:', newApplication);
 
-  // Return success message including the new ID
   return `Interest registered successfully! Application ID: ${newId}`;
 }
 
@@ -187,26 +216,25 @@ export async function updateApplicationStatus(
     status: 'accepted' | 'rejected'
 ): Promise<VolunteerApplication> {
     console.log(`Updating application ${applicationId} status to ${status}`);
-    await sleep(300); // Simulate delay
-    let applicationsData = await loadApplicationsData(); // Load current data
+    await sleep(300); 
+    let applicationsData = await loadApplicationsData();
 
     const appIndex = applicationsData.findIndex(app => app.id === applicationId);
     if (appIndex === -1) {
         throw new Error('Application not found.');
     }
 
-    if (Math.random() < 0.05) { // Simulate rare update failure
+    if (Math.random() < 0.05) { 
         throw new Error('Simulated error updating application status.');
     }
 
     applicationsData[appIndex].status = status;
-    applicationsData[appIndex].submittedAt = new Date(applicationsData[appIndex].submittedAt); // Ensure it's a Date object
+    applicationsData[appIndex].submittedAt = new Date(applicationsData[appIndex].submittedAt);
 
-    // Write updated data to file
     await writeData(APPLICATIONS_FILE, applicationsData);
 
     console.log('Application status updated and saved:', applicationsData[appIndex]);
-    return { ...applicationsData[appIndex] }; // Return a copy
+    return { ...applicationsData[appIndex] };
 }
 
 // --- CRUD for Opportunities ---
@@ -218,14 +246,14 @@ export async function updateApplicationStatus(
  */
 export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>): Promise<Opportunity> {
     await sleep(300);
-    let opportunitiesData = await loadOpportunitiesData(); // Load current data
+    let opportunitiesData = await loadOpportunitiesData();
     const newId = `opp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const newOpportunity: Opportunity = {
       ...opportunityData,
       id: newId,
-      // Ensure pointsAwarded is a number, default to 0 if undefined or invalid
       pointsAwarded: typeof opportunityData.pointsAwarded === 'number' && opportunityData.pointsAwarded >= 0 ? opportunityData.pointsAwarded : 0,
-      imageUrl: opportunityData.imageUrl || undefined, // Keep image URL if provided
+      imageUrl: opportunityData.imageUrl || undefined,
+      createdAt: new Date(), // Add createdAt timestamp
     };
 
     opportunitiesData.push(newOpportunity);

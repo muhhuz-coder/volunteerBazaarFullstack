@@ -13,12 +13,19 @@ import type { Opportunity, VolunteerApplication } from '@/services/job-board';
 
 /**
  * Server action to get volunteer opportunities.
+ * Now includes location, commitment, and sort parameters.
  */
-export async function getOpportunitiesAction(keywords?: string, category?: string): Promise<Opportunity[]> {
-    console.log('Server Action: Getting opportunities. Keywords:', keywords, 'Category:', category);
+export async function getOpportunitiesAction(
+    keywords?: string,
+    category?: string,
+    location?: string, // New parameter
+    commitment?: string, // New parameter
+    sort?: string // New parameter for sorting (e.g., 'recent', 'title_asc')
+): Promise<Opportunity[]> {
+    console.log('Server Action: Getting opportunities. Keywords:', keywords, 'Category:', category, 'Location:', location, 'Commitment:', commitment, 'Sort:', sort);
     try {
-        const opportunities = await getOpportunitiesService(keywords, category);
-        // Ensure dates or complex objects are serializable if needed (they are simple here)
+        // Pass new parameters to the service layer
+        const opportunities = await getOpportunitiesService(keywords, category, location, commitment, sort);
         return opportunities;
     } catch (error: any) {
         console.error("Server Action: Get opportunities error -", error);
@@ -33,8 +40,6 @@ export async function getApplicationsForOrganizationAction(organizationId: strin
     console.log('Server Action: Getting applications for organization:', organizationId);
     try {
         const applications = await getOrgAppsService(organizationId);
-        // Ensure dates are serializable (convert to string or keep as Date if supported)
-        // Service layer already ensures they are Date objects, which Next.js handles
         return applications;
     } catch (error: any) {
         console.error("Server Action: Get organization applications error -", error);
@@ -49,7 +54,6 @@ export async function getApplicationsForVolunteerAction(volunteerId: string): Pr
     console.log('Server Action: Getting applications for volunteer:', volunteerId);
     try {
         const applications = await getVolunteerAppsService(volunteerId);
-        // Ensure dates are serializable
         return applications;
     } catch (error: any) {
         console.error("Server Action: Get volunteer applications error -", error);
@@ -81,21 +85,17 @@ export async function createOpportunityAction(
 ): Promise<{ success: boolean; message: string; opportunity?: Opportunity | null }> {
     console.log('Server Action: Creating opportunity for org:', organizationId);
     try {
-        // Add validation logic here if needed (e.g., check if fields are empty)
         if (!opportunityData.title || !opportunityData.description || !opportunityData.location || !opportunityData.commitment || !opportunityData.category) {
             return { success: false, message: 'Missing required opportunity details.', opportunity: null };
         }
-        // Validate imageUrl if present (must be data URI)
         if (opportunityData.imageUrl && !opportunityData.imageUrl.startsWith('data:image')) {
              return { success: false, message: 'Invalid image format provided.', opportunity: null };
         }
 
-
         const newOpportunity = await createOpportunityService({
             ...opportunityData,
-            organizationId: organizationId, // Ensure the correct org ID is set
-            organization: organizationName // Ensure the correct org name is set
-            // imageUrl is already included in opportunityData if provided
+            organizationId: organizationId,
+            organization: organizationName
         });
         return { success: true, message: 'Opportunity created successfully.', opportunity: newOpportunity };
     } catch (error: any) {
