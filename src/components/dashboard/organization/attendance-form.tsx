@@ -1,4 +1,3 @@
-
 // src/components/dashboard/organization/attendance-form.tsx
 'use client';
 
@@ -48,7 +47,7 @@ export function AttendanceForm({ application, onFormSubmit }: AttendanceFormProp
     defaultValues: {
       attendance: application.attendance || 'pending',
       orgRating: application.orgRating || undefined,
-      hoursLoggedByOrg: application.hoursLoggedByOrg || undefined,
+      hoursLoggedByOrg: application.hoursLoggedByOrg === null ? undefined : application.hoursLoggedByOrg, // Ensure null becomes undefined
     },
   });
 
@@ -125,11 +124,16 @@ export function AttendanceForm({ application, onFormSubmit }: AttendanceFormProp
             <FormItem>
               <FormLabel className="flex items-center gap-2"><Star className="h-4 w-4" /> Volunteer Rating (1-5, Optional)</FormLabel>
               <FormControl>
-                <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} defaultValue={field.value?.toString()}>
+                <Select 
+                  onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
+                  defaultValue={field.value?.toString()}
+                  value={field.value?.toString() ?? ""} // Ensure value is controlled
+                >
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder="Rate volunteer performance" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">No Rating</SelectItem> 
                     {[1, 2, 3, 4, 5].map(num => (
                       <SelectItem key={num} value={num.toString()}>{num} Star{num > 1 ? 's' : ''}</SelectItem>
                     ))}
@@ -148,7 +152,26 @@ export function AttendanceForm({ application, onFormSubmit }: AttendanceFormProp
             <FormItem>
               <FormLabel className="flex items-center gap-2"><Clock className="h-4 w-4" /> Hours Logged (Optional)</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="e.g., 3.5" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} className="bg-background" min="0" step="0.1" />
+                <Input
+                  type="number"
+                  placeholder="e.g., 3.5"
+                  value={field.value ?? ''} // Use empty string if field.value is undefined or null
+                  onChange={e => {
+                    const rawValue = e.target.value;
+                    if (rawValue === '') {
+                      field.onChange(undefined); // Set to undefined if input is empty
+                    } else {
+                      const num = parseFloat(rawValue);
+                      field.onChange(isNaN(num) ? undefined : num); // Set to number or undefined if NaN
+                    }
+                  }}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
+                  className="bg-background"
+                  min="0"
+                  step="0.1"
+                />
               </FormControl>
               <FormDescription>Enter the number of hours the volunteer contributed.</FormDescription>
               <FormMessage />
