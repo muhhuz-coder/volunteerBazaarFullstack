@@ -25,6 +25,7 @@ import { Menu } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { NotificationDropdown } from '@/components/layout/notification-dropdown';
+import { ChatbotWidget } from '@/components/chatbot-widget';
 
 
 export function Header() {
@@ -43,22 +44,21 @@ export function Header() {
 
   const dashboardPath = role === 'organization' ? '/dashboard/organization'
                       : role === 'volunteer' ? '/dashboard/volunteer'
-                      : '/select-role';
+                      : '/select-role'; // Fallback to select-role if role is null
 
    const baseNavLinks = [
-     { href: "/", label: "Home", icon: Home }, // Changed icon to Home
-     { href: "/opportunities", label: "Opportunities", icon: Briefcase }, // Added Opportunities link
+     { href: "/", label: "Home", icon: Home },
+     { href: "/opportunities", label: "Opportunities", icon: Search }, // Icon changed to Search
      { href: "/volunteers", label: "Volunteers", icon: Users },
      { href: "/about", label: "About Us", icon: Info },
      { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
      { href: "/contact", label: "Contact", icon: Mail },
    ];
 
-   // Adjusted navLinks logic to ensure "Home" and "Contact" are correctly placed for logged-in users
    const navLinks = user
      ? [
          { href: "/", label: "Home", icon: Home },
-         { href: "/opportunities", label: "Opportunities", icon: Briefcase },
+         { href: "/opportunities", label: "Opportunities", icon: Search }, // Icon changed to Search
          { href: "/volunteers", label: "Volunteers", icon: Users },
          { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
          { href: "/about", label: "About Us", icon: Info },
@@ -71,20 +71,22 @@ export function Header() {
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
-    <header className="bg-primary/95 text-primary-foreground shadow-md sticky top-0 z-40 backdrop-blur-sm">
+    <header className="bg-primary/95 text-primary-foreground shadow-lg sticky top-0 z-40 backdrop-blur-sm">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-        <Link href="/" className="flex items-center gap-2 text-xl md:text-2xl font-bold">
-          <AppIcon className="h-6 w-6 md:h-7 md:w-7" />
-          <span>VolunteerBazaar</span>
+        <Link href="/" className="flex items-center gap-2 text-xl md:text-2xl font-bold hover:opacity-90 transition-opacity">
+          <AppIcon className="h-7 w-7 md:h-8 md:w-8 text-accent-foreground" /> {/* Made icon slightly larger and used accent foreground */}
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-background to-secondary/70">VolunteerBazaar</span>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1 lg:gap-2"> {/* Reduced gap slightly */}
+        <nav className="hidden md:flex items-center gap-1 lg:gap-2">
            {navLinks.map(link => (
-              <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10 relative px-2 lg:px-3"> {/* Reduced padding for smaller screens */}
-                <Link href={link.href} className="flex items-center gap-1.5">
-                   {link.icon && <link.icon className="h-4 w-4" />}
-                   {link.label}
+              <Button key={link.href} variant="ghost" asChild className="text-sm font-medium hover:bg-primary-foreground/10 relative px-2 lg:px-3">
+                <Link href={link.href}>
+                  <span className="flex items-center gap-1.5"> {/* Wrap Link children in a span */}
+                    {link.icon && <link.icon className="h-4 w-4" />}
+                    {link.label}
+                  </span>
                 </Link>
               </Button>
            ))}
@@ -95,12 +97,12 @@ export function Header() {
           {user && !loading && <NotificationDropdown />}
           
           {loading ? (
-             <Skeleton className="h-9 w-9 rounded-full" />
+             <Skeleton className="h-9 w-9 rounded-full bg-primary/70" />
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-primary-foreground/10 p-0">
-                  <Avatar className="h-9 w-9">
+                  <Avatar className="h-9 w-9 border-2 border-primary-foreground/50">
                     {user.profilePictureUrl && (
                        <AvatarImage src={user.profilePictureUrl} alt={user.displayName || 'Profile Picture'} />
                     )}
@@ -158,11 +160,11 @@ export function Header() {
                            </Link>
                        </DropdownMenuItem>
                      </>
-                 ) : (
+                 ) : ( // User is logged in but role is null
                      <DropdownMenuItem asChild>
                         <Link href="/select-role">
-                         <LayoutDashboard className="mr-2 h-4 w-4" />
-                         <span>Select Role</span>
+                         <LayoutDashboard className="mr-2 h-4 w-4" /> {/* Icon can be generic here */}
+                         <span>Complete Profile</span>
                         </Link>
                      </DropdownMenuItem>
                  )}
@@ -175,10 +177,10 @@ export function Header() {
             </DropdownMenu>
           ) : (
              <div className="hidden md:flex items-center gap-2">
-               <Button variant="secondary" size="sm" asChild>
+               <Button variant="secondary" size="sm" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
                  <Link href="/login">Login</Link>
                </Button>
-               <Button variant="outline" size="sm" asChild className="text-primary border-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+               <Button variant="outline" size="sm" asChild className="border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10">
                   <Link href="/signup">Sign Up</Link>
                </Button>
              </div>
@@ -187,19 +189,24 @@ export function Header() {
           <div className="md:hidden">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-primary-foreground/10">
+                <Button variant="ghost" size="icon" className="hover:bg-primary-foreground/10 text-primary-foreground">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[280px] bg-background text-foreground p-4 flex flex-col">
-                 <h2 className="text-lg font-semibold mb-4 border-b pb-2">Menu</h2>
+              <SheetContent side="right" className="w-[280px] bg-card text-card-foreground p-4 flex flex-col shadow-xl">
+                 <div className="flex items-center justify-between pb-3 border-b mb-3">
+                    <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary" onClick={closeMobileMenu}>
+                      <AppIcon className="h-6 w-6" />
+                      <span>VolunteerBazaar</span>
+                    </Link>
+                 </div>
                  <nav className="flex flex-col gap-2 mb-6">
                     {navLinks.map(link => (
-                       <Button key={link.href} variant="ghost" asChild className="justify-start text-base" onClick={closeMobileMenu}>
-                         <Link href={link.href} className="flex items-center gap-2">
-                           {link.icon && <link.icon className="h-5 w-5" />}
-                           {link.label}
+                       <Button key={link.href} variant="ghost" asChild className="justify-start text-base py-2.5" onClick={closeMobileMenu}>
+                         <Link href={link.href} className="flex items-center gap-3">
+                           {link.icon && <link.icon className="h-5 w-5 text-muted-foreground" />}
+                           <span className="text-foreground">{link.label}</span>
                          </Link>
                        </Button>
                     ))}
@@ -207,33 +214,33 @@ export function Header() {
                  <div className="mt-auto pt-4 border-t">
                    {user ? (
                      <>
-                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base" onClick={closeMobileMenu}>
-                         <Link href={dashboardPath} className="flex items-center">
-                           <LayoutDashboard className="mr-2 h-5 w-5" /> Dashboard
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base py-2.5" onClick={closeMobileMenu}>
+                         <Link href={dashboardPath} className="flex items-center gap-3">
+                           <LayoutDashboard className="mr-2 h-5 w-5 text-muted-foreground" /> <span className="text-foreground">Dashboard</span>
                          </Link>
                        </Button>
-                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base" onClick={closeMobileMenu}>
-                         <Link href="/profile/edit" className="flex items-center">
-                           <Edit className="mr-2 h-5 w-5" /> Edit Profile
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base py-2.5" onClick={closeMobileMenu}>
+                         <Link href="/profile/edit" className="flex items-center gap-3">
+                           <Edit className="mr-2 h-5 w-5 text-muted-foreground" /> <span className="text-foreground">Edit Profile</span>
                          </Link>
                        </Button>
-                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base" onClick={closeMobileMenu}>
-                          <Link href="/dashboard/messages" className="flex items-center">
-                            <MessageSquare className="mr-2 h-5 w-5" /> Messages
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base py-2.5" onClick={closeMobileMenu}>
+                          <Link href="/dashboard/messages" className="flex items-center gap-3">
+                            <MessageSquare className="mr-2 h-5 w-5 text-muted-foreground" /> <span className="text-foreground">Messages</span>
                           </Link>
                        </Button>
-                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base" onClick={closeMobileMenu}>
-                         <Link href="/notifications" className="flex items-center"> 
-                           <Bell className="mr-2 h-5 w-5" /> Notifications
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2 text-base py-2.5" onClick={closeMobileMenu}>
+                         <Link href="/notifications" className="flex items-center gap-3"> 
+                           <Bell className="mr-2 h-5 w-5 text-muted-foreground" /> <span className="text-foreground">Notifications</span>
                          </Link>
                        </Button>
-                       <Button variant="destructive" size="sm" className="w-full" onClick={() => { signOut(); closeMobileMenu(); }}>
+                       <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => { signOut(); closeMobileMenu(); }}>
                          <LogOut className="mr-2 h-4 w-4" /> Log Out
                        </Button>
                      </>
                    ) : (
-                     <div className="flex flex-col gap-2">
-                       <Button variant="secondary" asChild className="w-full" onClick={closeMobileMenu}>
+                     <div className="flex flex-col gap-3">
+                       <Button variant="default" asChild className="w-full bg-accent text-accent-foreground" onClick={closeMobileMenu}>
                          <Link href="/login">Login</Link>
                        </Button>
                        <Button variant="outline" asChild className="w-full" onClick={closeMobileMenu}>
