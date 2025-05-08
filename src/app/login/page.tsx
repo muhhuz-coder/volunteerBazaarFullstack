@@ -11,7 +11,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LogIn } from 'lucide-react';
+import { Loader2, LogIn, KeyRound, Mail } from 'lucide-react'; // Added KeyRound and Mail icons
+import { Separator } from '@/components/ui/separator'; // Added Separator
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,44 +20,39 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { signIn } = useAuth(); // Use signIn from the mock context
+  const { signInWithEmail } = useAuth(); // Use signInWithEmail for local auth
   const { toast } = useToast();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // REMOVED: Google Sign-In related state and handlers
+  // const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      // Use the mock signIn function
-      const result = await signIn(email, password);
+      const result = await signInWithEmail(email, password);
 
       if (result.success) {
         toast({
           title: 'Login Successful',
           description: 'Welcome back!',
         });
-
-        // Redirect based on role returned by mock signIn (updated roles)
-        if (result.role === 'organization') {
-          router.push('/dashboard/organization');
-        } else if (result.role === 'volunteer') {
-          router.push('/dashboard/volunteer');
-        } else {
-          // If role is not set or null, redirect to role selection or default dashboard
-          router.push('/select-role'); // Or '/' or a default dashboard
-        }
+        // Role-based redirection is handled by onAuthStateChanged listener in AuthContext
+        // It will push to '/select-role' if role is not set, or dashboard if set.
+        // If onAuthStateChanged doesn't redirect quickly enough, a default push can be added here,
+        // but it's better to let the context handle it for consistency.
+        // Example: router.push(result.role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer');
       } else {
-         setError(result.message || 'Login failed.');
-         toast({
-           title: 'Login Failed',
-           description: result.message || 'Please check your email and password.',
-           variant: 'destructive',
-         });
+        setError(result.message || 'Login failed.');
+        toast({
+          title: 'Login Failed',
+          description: result.message || 'Please check your email and password.',
+          variant: 'destructive',
+        });
       }
-
     } catch (err: any) {
-      // Catch unexpected errors during the mock process
       console.error("Login process failed:", err);
       setError('An unexpected error occurred during login.');
       toast({
@@ -69,18 +65,20 @@ export default function LoginPage() {
     }
   };
 
+  // REMOVED: handleGoogleSignIn function
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary via-background to-secondary p-4"> {/* Added gradient background */}
-      <Card className="w-full max-w-md shadow-xl border"> {/* Increased shadow */}
-        <CardHeader className="space-y-2 text-center pt-8 pb-4"> {/* Adjusted padding */}
-          <LogIn className="mx-auto h-10 w-10 text-primary mb-2" /> {/* Added icon */}
-          <CardTitle className="text-2xl font-bold text-primary">Welcome Back</CardTitle>
-          <CardDescription>Login to manage your volunteer activities.</CardDescription>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary via-background to-secondary p-4">
+      <Card className="w-full max-w-md shadow-xl border overflow-hidden">
+        <CardHeader className="space-y-2 text-center pt-8 pb-6 bg-primary/5">
+          <LogIn className="mx-auto h-12 w-12 text-primary mb-2" />
+          <CardTitle className="text-3xl font-bold text-primary">Welcome Back</CardTitle>
+          <CardDescription className="text-base text-muted-foreground">Login to manage your volunteer activities.</CardDescription>
         </CardHeader>
-        <CardContent className="px-6 pb-6"> {/* Adjusted padding */}
-          <form onSubmit={handleLogin} className="space-y-5"> {/* Increased spacing */}
-            <div className="grid gap-1.5"> {/* Adjusted gap */}
-              <Label htmlFor="email">Email</Label>
+        <CardContent className="px-6 pt-6 pb-4">
+          <form onSubmit={handleEmailLogin} className="space-y-5">
+            <div className="grid gap-2">
+              <Label htmlFor="email" className="flex items-center gap-2 text-sm"><Mail className="h-4 w-4 text-muted-foreground" />Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -88,48 +86,68 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
+                className="bg-background border-border focus:border-primary focus:ring-primary/50 h-10 text-sm"
               />
             </div>
-            <div className="grid gap-1.5"> {/* Adjusted gap */}
-              <Label htmlFor="password">Password</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="password" className="flex items-center gap-2 text-sm"><KeyRound className="h-4 w-4 text-muted-foreground" />Password</Label>
               <Input
                 id="password"
                 type="password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="bg-background border-border focus:border-primary focus:ring-primary/50" // Added focus styles
+                className="bg-background border-border focus:border-primary focus:ring-primary/50 h-10 text-sm"
               />
             </div>
-             {error && (
-               <p className="text-sm text-destructive text-center pt-1">{error}</p> // Added top padding
-             )}
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 text-base font-semibold" disabled={loading}> {/* Increased padding/font size */}
+            {error && (
+              <p className="text-sm text-destructive text-center pt-1">{error}</p>
+            )}
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base font-semibold transition-all duration-300 ease-in-out hover:shadow-lg" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Logging in...
                 </>
               ) : (
-                 <>
+                <>
                   <LogIn className="mr-2 h-4 w-4" /> Login
-                 </>
+                </>
               )}
             </Button>
           </form>
+          
+          {/* REMOVED: Google Sign-In Button and Separator Logic
+          <Separator className="my-6" />
+          <Button 
+            variant="outline" 
+            className="w-full py-3 text-base font-semibold border-border hover:bg-muted/50 transition-all duration-300 ease-in-out hover:shadow-lg" 
+            onClick={handleGoogleSignIn} 
+            disabled={googleLoading || loading}
+          >
+            {googleLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.5 512 0 401.5 0 265.5S110.5 19 244 19c70.5 0 132.5 29.5 177.5 78.5l-67.5 62.5C320.5 134.5 286 112 244 112c-83.5 0-151.5 67.5-151.5 153.5S160.5 419 244 419c52.5 0 96.5-20.5 126-50.5 27-27 43.5-62.5 48.5-107.5H244V261.8h244z"></path></svg>
+                Sign in with Google
+              </>
+            )}
+          </Button> 
+          */}
+
         </CardContent>
-        <CardFooter className="flex flex-col gap-3 text-center text-sm pb-8"> {/* Increased gap and padding */}
+        <CardFooter className="flex flex-col gap-4 text-center text-sm pb-8 bg-primary/5 pt-4">
           <p className="text-muted-foreground">
             Don't have an account?{' '}
-            <Link href="/signup" className="font-medium text-primary hover:underline">
-              Sign up
+            <Link href="/signup" className="font-semibold text-primary hover:underline">
+              Sign up here
             </Link>
           </p>
-           {/* Add Forgot Password link later if needed */}
-           {/* <Link href="/forgot-password" className="underline text-muted-foreground hover:text-primary/80">
-             Forgot password?
-           </Link> */}
         </CardFooter>
       </Card>
     </div>
