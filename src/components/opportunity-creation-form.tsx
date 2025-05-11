@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,7 +7,7 @@ import * as z from 'zod';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, CalendarDays } from "lucide-react"; 
+import { Calendar as CalendarIcon, CalendarDays, Sparkles } from "lucide-react"; 
 import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
@@ -53,10 +54,11 @@ const formSchema = z.object({
   category: z.string().refine(val => val !== 'All' && opportunityCategories.includes(val), {
     message: 'Please select a valid category.',
   }),
+  requiredSkills: z.string().optional(), // Textarea for comma-separated skills
   pointsAwarded: z.coerce.number().min(0, 'Points must be 0 or greater.').optional(),
   applicationDeadline: z.date().optional(),
-  eventStartDate: z.date().optional(),
-  eventEndDate: z.date().optional(),
+  eventStartDate: z.date().refine(val => val !== undefined, {message: "Event start date is required."}),
+  eventEndDate: z.date().refine(val => val !== undefined, {message: "Event end date is required."}),
   image: z
     .custom<FileList>()
     .optional()
@@ -108,6 +110,7 @@ export function OpportunityCreationForm({
       location: initialData.location || '',
       commitment: initialData.commitment || '',
       category: initialData.category || '',
+      requiredSkills: initialData.requiredSkills?.join(', ') || '',
       pointsAwarded: initialData.pointsAwarded ?? 0,
       applicationDeadline: initialData.applicationDeadline ? new Date(initialData.applicationDeadline) : undefined,
       eventStartDate: initialData.eventStartDate ? new Date(initialData.eventStartDate) : undefined,
@@ -119,6 +122,7 @@ export function OpportunityCreationForm({
       location: '',
       commitment: '',
       category: '',
+      requiredSkills: '',
       pointsAwarded: 0,
       applicationDeadline: undefined,
       eventStartDate: undefined,
@@ -135,6 +139,7 @@ export function OpportunityCreationForm({
         location: initialData.location || '',
         commitment: initialData.commitment || '',
         category: initialData.category || '',
+        requiredSkills: initialData.requiredSkills?.join(', ') || '',
         pointsAwarded: initialData.pointsAwarded ?? 0,
         applicationDeadline: initialData.applicationDeadline ? new Date(initialData.applicationDeadline) : undefined,
         eventStartDate: initialData.eventStartDate ? new Date(initialData.eventStartDate) : undefined,
@@ -168,9 +173,11 @@ export function OpportunityCreationForm({
         finalImageUrl = undefined;
     }
 
+    const skillsArray = values.requiredSkills ? values.requiredSkills.split(',').map(s => s.trim()).filter(s => s) : [];
 
     const opportunityPayload = {
       ...values,
+      requiredSkills: skillsArray,
       imageUrl: finalImageUrl, // Use the determined image URL
       pointsAwarded: values.pointsAwarded ?? 0,
       // Dates are already Date objects from the form
@@ -316,6 +323,28 @@ export function OpportunityCreationForm({
             </FormItem>
           )}
         />
+        
+        {/* Required Skills */}
+        <FormField
+          control={form.control}
+          name="requiredSkills"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-muted-foreground" /> Required Skills (Optional)</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder="e.g., Communication, Teamwork, Event Planning" 
+                  className="resize-none bg-background" 
+                  rows={3} 
+                  {...field} 
+                />
+              </FormControl>
+              <FormDescription>Enter skills separated by commas. Volunteers with matching skills may be suggested.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
 
          {/* Application Deadline (Optional) */}
          <FormField
@@ -363,13 +392,13 @@ export function OpportunityCreationForm({
            )}
          />
 
-        {/* Event Start Date (Optional) */}
+        {/* Event Start Date (Optional -> Required) */}
         <FormField
           control={form.control}
           name="eventStartDate"
           render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Event Start Date (Optional)</FormLabel>
+              <FormLabel className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Event Start Date</FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>
@@ -406,13 +435,13 @@ export function OpportunityCreationForm({
           )}
         />
 
-        {/* Event End Date (Optional) */}
+        {/* Event End Date (Optional -> Required) */}
         <FormField
           control={form.control}
           name="eventEndDate"
           render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Event End Date (Optional)</FormLabel>
+              <FormLabel className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Event End Date</FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>

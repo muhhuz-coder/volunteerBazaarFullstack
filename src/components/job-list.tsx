@@ -8,7 +8,7 @@ import Image from 'next/image';
 import type { Opportunity } from '@/services/job-board';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, Briefcase, LayoutGrid, List, Users, Handshake, Star, Eye, CalendarClock, CalendarDays, Info } from 'lucide-react';
+import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, Briefcase, LayoutGrid, List, Users, Handshake, Star, Eye, CalendarClock, CalendarDays, Info, Sparkles } from 'lucide-react'; // Added Sparkles
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -192,6 +192,17 @@ export function OpportunityList({
             <Clock className="h-4 w-4 flex-shrink-0" />
             <span className="line-clamp-1">{opportunity.commitment}</span>
           </div>
+          {opportunity.requiredSkills && opportunity.requiredSkills.length > 0 && (
+            <div className="flex items-start gap-2 text-muted-foreground">
+              <Sparkles className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <div className="flex flex-wrap gap-1">
+                {opportunity.requiredSkills.slice(0, 3).map(skill => (
+                    <Badge key={skill} variant="secondary" className="text-xs font-normal">{skill}</Badge>
+                ))}
+                {opportunity.requiredSkills.length > 3 && <Badge variant="secondary" className="text-xs font-normal">+{opportunity.requiredSkills.length-3} more</Badge>}
+              </div>
+            </div>
+          )}
           {opportunity.applicationDeadline && (
             <div className="flex items-center gap-2 text-destructive/90 font-medium">
                 <CalendarClock className="h-4 w-4 flex-shrink-0" />
@@ -241,6 +252,17 @@ export function OpportunityList({
                   <Star className="h-5 w-5 text-yellow-400" /> {opportunity.pointsAwarded}
                 </p>
               </div>
+            )}
+            {opportunity.requiredSkills && opportunity.requiredSkills.length > 0 && (
+                <div className="mb-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Key Skills</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                         {opportunity.requiredSkills.slice(0,4).map(skill => (
+                            <Badge key={skill} variant="outline" className="text-xs">{skill}</Badge>
+                        ))}
+                        {opportunity.requiredSkills.length > 4 && <Badge variant="outline" className="text-xs">+{opportunity.requiredSkills.length - 4} more</Badge>}
+                    </div>
+                </div>
             )}
              {opportunity.applicationDeadline && (
                <div className="mb-3">

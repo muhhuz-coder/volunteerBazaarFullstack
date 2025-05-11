@@ -1,3 +1,4 @@
+
 // src/actions/job-board-actions.ts
 'use server';
 
@@ -87,8 +88,8 @@ export async function createOpportunityAction(
 ): Promise<{ success: boolean; message: string; opportunity?: Opportunity | null }> {
     console.log('Server Action: Creating opportunity for org:', organizationId);
     try {
-        if (!opportunityData.title || !opportunityData.description || !opportunityData.location || !opportunityData.commitment || !opportunityData.category) {
-            return { success: false, message: 'Missing required opportunity details.', opportunity: null };
+        if (!opportunityData.title || !opportunityData.description || !opportunityData.location || !opportunityData.commitment || !opportunityData.category || !opportunityData.eventStartDate || !opportunityData.eventEndDate) {
+            return { success: false, message: 'Missing required opportunity details including event dates.', opportunity: null };
         }
         if (opportunityData.imageUrl && !opportunityData.imageUrl.startsWith('data:image') && !opportunityData.imageUrl.startsWith('http')) {
              return { success: false, message: 'Invalid image format provided.', opportunity: null };
@@ -98,9 +99,10 @@ export async function createOpportunityAction(
             ...opportunityData,
             organizationId: organizationId, 
             organization: organizationName,
+            requiredSkills: opportunityData.requiredSkills || [], // Ensure requiredSkills is an array
             applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : undefined,
-            eventStartDate: opportunityData.eventStartDate ? new Date(opportunityData.eventStartDate) : undefined,
-            eventEndDate: opportunityData.eventEndDate ? new Date(opportunityData.eventEndDate) : undefined,
+            eventStartDate: new Date(opportunityData.eventStartDate), // Event dates are now required
+            eventEndDate: new Date(opportunityData.eventEndDate),
         });
         return { success: true, message: 'Opportunity created successfully.', opportunity: newOpportunity };
     } catch (error: any) {
@@ -123,10 +125,19 @@ export async function updateOpportunityAction(
         if (opportunityData.imageUrl && !opportunityData.imageUrl.startsWith('data:image') && !opportunityData.imageUrl.startsWith('http')) {
             return { success: false, message: 'Invalid image format provided.', opportunity: null };
         }
+         if (opportunityData.eventStartDate && !opportunityData.eventEndDate && !getOpportunityByIdService(opportunityId)?.eventEndDate) {
+             return { success: false, message: 'Event end date is required if start date is provided.', opportunity: null };
+         }
+         if (!opportunityData.eventStartDate && opportunityData.eventEndDate && !getOpportunityByIdService(opportunityId)?.eventStartDate) {
+             return { success: false, message: 'Event start date is required if end date is provided.', opportunity: null };
+         }
 
-        // The service should handle ensuring the org owns the opportunity if necessary,
-        // but for this mock, we'll assume the ID is sufficient and orgId is for logging/future.
-        const updatedOpportunity = await updateOpportunityService(opportunityId, opportunityData);
+
+        const updatedOpportunity = await updateOpportunityService(opportunityId, {
+            ...opportunityData,
+            requiredSkills: opportunityData.requiredSkills || [], // Ensure requiredSkills is an array if provided
+            // Dates will be handled by the service if they exist in opportunityData
+        });
         
         if (!updatedOpportunity) {
             return { success: false, message: 'Opportunity not found or update failed.', opportunity: null };

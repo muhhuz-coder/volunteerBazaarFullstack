@@ -1,3 +1,4 @@
+
 'use server';
 // src/services/job-board.ts
 import { readData, writeData } from '@/lib/db-utils';
@@ -15,6 +16,7 @@ export interface Opportunity {
   location: string;
   commitment: string;
   category: string;
+  requiredSkills?: string[]; // New: Skills required for the opportunity
   pointsAwarded?: number; // Optional points awarded upon completion/acceptance
   imageUrl?: string; // Optional image for the opportunity (Data URI or URL)
   createdAt?: Date | string; // Optional: Timestamp for when opportunity was created for sorting
@@ -62,6 +64,7 @@ async function loadOpportunitiesData(): Promise<Opportunity[]> {
         applicationDeadline: opp.applicationDeadline ? new Date(opp.applicationDeadline) : undefined,
         eventStartDate: opp.eventStartDate ? new Date(opp.eventStartDate) : undefined,
         eventEndDate: opp.eventEndDate ? new Date(opp.eventEndDate) : undefined,
+        requiredSkills: opp.requiredSkills || [], // Ensure requiredSkills is an array
     }));
 }
 
@@ -104,7 +107,8 @@ export async function getOpportunities(
     opportunitiesData = opportunitiesData.filter(opp =>
       opp.title.toLowerCase().includes(lowerKeywords) ||
       opp.organization.toLowerCase().includes(lowerKeywords) ||
-      opp.description.toLowerCase().includes(lowerKeywords)
+      opp.description.toLowerCase().includes(lowerKeywords) ||
+      (opp.requiredSkills && opp.requiredSkills.some(skill => skill.toLowerCase().includes(lowerKeywords)))
     );
   }
 
@@ -309,6 +313,7 @@ export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>
       id: newId,
       pointsAwarded: typeof opportunityData.pointsAwarded === 'number' && opportunityData.pointsAwarded >= 0 ? opportunityData.pointsAwarded : 0,
       imageUrl: opportunityData.imageUrl || undefined,
+      requiredSkills: opportunityData.requiredSkills || [],
       createdAt: now, 
       updatedAt: now,
       applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : undefined,
@@ -338,6 +343,7 @@ export async function getOpportunityById(id: string): Promise<Opportunity | unde
       opportunity.applicationDeadline = opportunity.applicationDeadline ? new Date(opportunity.applicationDeadline) : undefined;
       opportunity.eventStartDate = opportunity.eventStartDate ? new Date(opportunity.eventStartDate) : undefined;
       opportunity.eventEndDate = opportunity.eventEndDate ? new Date(opportunity.eventEndDate) : undefined;
+      opportunity.requiredSkills = opportunity.requiredSkills || [];
     }
     return opportunity ? { ...opportunity } : undefined;
 }
@@ -365,6 +371,7 @@ export async function updateOpportunity(
   const updatedOpportunity: Opportunity = {
     ...opportunitiesData[opportunityIndex],
     ...opportunityData,
+    requiredSkills: opportunityData.requiredSkills || opportunitiesData[opportunityIndex].requiredSkills || [],
     updatedAt: new Date(), // Set/update the updatedAt timestamp
      // Ensure date fields are correctly formatted as Date objects if provided
     applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : opportunitiesData[opportunityIndex].applicationDeadline,
@@ -469,4 +476,3 @@ export async function recordVolunteerPerformance(
   console.log('Volunteer performance recorded and saved:', applicationsData[appIndex]);
   return { ...applicationsData[appIndex] };
 }
-

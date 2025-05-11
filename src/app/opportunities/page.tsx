@@ -1,3 +1,4 @@
+
 // src/app/opportunities/page.tsx
 import { Header } from '@/components/layout/header';
 import { OpportunitySearch } from '@/components/job-search';
@@ -5,7 +6,7 @@ import { OpportunityList } from '@/components/job-list';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getOpportunitiesAction } from '@/actions/job-board-actions';
-import { Briefcase, MapPin, Activity, Clock, Star, CalendarClock, CalendarDays, ListFilter } from 'lucide-react';
+import { Briefcase, MapPin, Activity, Clock, Star, CalendarClock, CalendarDays, ListFilter, Sparkles } from 'lucide-react'; // Added Sparkles
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import Link from 'next/link';
@@ -35,6 +36,10 @@ function OpportunityListSkeleton({ view = 'grid' }: { view?: 'grid' | 'list' }) 
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground/70" />
               <Skeleton className="h-4 w-20 bg-muted-foreground/20" />
+            </div>
+             <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-muted-foreground/70" /> {/* Icon for skills */}
+              <Skeleton className="h-4 w-32 bg-muted-foreground/20" /> {/* Placeholder for skills */}
             </div>
              <div className="flex items-center gap-2">
               <CalendarClock className="h-4 w-4 text-muted-foreground/70" />
@@ -69,6 +74,10 @@ function OpportunityListSkeleton({ view = 'grid' }: { view?: 'grid' | 'list' }) 
              <div className="text-sm">
                  <Skeleton className="h-4 w-20 mb-1 bg-muted-foreground/20" />
                  <Skeleton className="h-6 w-24 bg-muted-foreground/30" />
+            </div>
+            <div className="text-sm">
+                 <Skeleton className="h-4 w-32 mb-1 bg-muted-foreground/20" /> {/* Skills placeholder */}
+                 <Skeleton className="h-6 w-20 bg-muted-foreground/30" />
             </div>
             <div className="text-sm">
                  <Skeleton className="h-4 w-32 mb-1 bg-muted-foreground/20" />
