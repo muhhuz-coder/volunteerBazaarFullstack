@@ -1,3 +1,4 @@
+
 // src/services/user-service.ts
 'use server';
 
@@ -103,5 +104,3 @@ export async function getPublicVolunteers(filters?: {
         : { points: 0, badges: [], hours: 0 }
   }));
 }
-
-```
