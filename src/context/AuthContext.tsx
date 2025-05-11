@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 import type { VolunteerApplication } from '@/services/job-board';
 import type { Conversation } from '@/services/messaging';
 import type { VolunteerStats } from '@/services/gamification';
+import type { Report } from '@/services/user-service';
 
 // Import server actions
 import {
@@ -78,7 +79,7 @@ interface AuthContextType {
   logHours: (userId: string, hours: number, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
   blockUser: (userIdToBlock: string) => Promise<{ success: boolean; message: string; updatedUser?: UserProfile | null }>;
   unblockUser: (userIdToUnblock: string) => Promise<{ success: boolean; message: string; updatedUser?: UserProfile | null }>;
-  reportUser: (reportedUserId: string, reason: string, details?: string) => Promise<{ success: boolean; message: string }>;
+  reportUser: (reportedUserId: string, reason: string, details?: string) => Promise<{ success: boolean; message: string, report?: Report | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -103,7 +104,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
     setRole(null);
     sessionStorage.removeItem('loggedInUser');
-    await sleep(100); // Short delay to ensure state updates propagate if needed
+    await sleep(100); 
     setLoading(false);
     router.push('/login');
     console.log('AuthContext: Sign out complete, redirected to /login');
@@ -237,7 +238,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const result = await updateUserProfileBioSkillsCausesAction(user.id, profileData);
       if (result.success && result.user) {
         setUser(result.user);
-        setRole(result.user.role); // Role might not change, but good to keep consistent
+        setRole(result.user.role); 
         sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
         return { success: true, message: result.message, user: result.user };
       }
@@ -272,6 +273,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
              }
              return { success: true, newStats: result.newStats };
          }
+         // @ts-ignore
          return { success: false, newStats: null, message: result.message };
        } catch (error: any) {
            return { success: false, newStats: null, message: error.message };
@@ -289,6 +291,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
               }
               return { success: true, newStats: result.newStats };
           }
+           // @ts-ignore
           return { success: false, newStats: null, message: result.message };
         } catch (error: any) {
             return { success: false, newStats: null, message: error.message };
@@ -306,6 +309,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 }
                 return { success: true, newStats: result.newStats };
             }
+             // @ts-ignore
             return { success: false, newStats: null, message: result.message };
         } catch (error: any) {
             return { success: false, newStats: null, message: error.message };
@@ -449,13 +453,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [user]);
 
-  const reportUser = useCallback(async (reportedUserId: string, reason: string, details?: string): Promise<{ success: boolean; message: string }> => {
-    if (!user) return { success: false, message: 'User not logged in.' };
+  const reportUser = useCallback(async (reportedUserId: string, reason: string, details?: string): Promise<{ success: boolean; message: string, report?: Report | null }> => {
+    if (!user) return { success: false, message: 'User not logged in.', report: null };
     setLoading(true);
     try {
       return await submitReportUserAction(user.id, user.displayName, reportedUserId, reason, details);
-    } catch (error: any) {
-      return { success: false, message: error.message || 'Failed to submit report.' };
+    } catch (error: any)      {
+      return { success: false, message: error.message || 'Failed to submit report.', report: null };
     } finally {
       setLoading(false);
     }
@@ -535,44 +539,44 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const isSelectRolePage = pathname === '/select-role';
     const isOnboardingPage = pathname === '/onboarding';
     const isAdminPage = pathname.startsWith('/admin');
-    const isRootPage = pathname === '/';
+    // const isRootPage = pathname === '/'; // No longer needed for redirect from root
 
-    if (user) { // User is logged in
+    if (user) { 
       if (user.isSuspended) {
-        if (pathname !== '/login') { // If already on login, no need to push again
+        if (pathname !== '/login') { 
             console.log(`AuthContext: User ${user.id} is suspended. Logging out and redirecting to /login.`);
-            signOut(); // This will clear session and push to /login
+            signOut(); 
         }
-        return; // Stop further processing if suspended
+        return; 
       }
 
-      if (!role) { // User logged in but no role assigned yet
-        if (!isSelectRolePage && !isOnboardingPage && !isAdminPage) { // Prevent redirect loops
+      if (!role) { 
+        if (!isSelectRolePage && !isOnboardingPage && !isAdminPage) { 
           console.log(`AuthContext: User ${user.id} has no role. Current path ${pathname}. Redirecting to /select-role.`);
           router.push('/select-role');
         } else {
           console.log(`AuthContext: User ${user.id} has no role, but on an allowed page ${pathname}. No redirect.`);
         }
-        return; // Stop further checks if no role
+        return; 
       }
 
-      // User has a role
-      if (user.onboardingCompleted === false) { // Onboarding not complete
-        if (!isOnboardingPage) { // If not already on onboarding page
+      
+      if (user.onboardingCompleted === false) { 
+        if (!isOnboardingPage) { 
           console.log(`AuthContext: User ${user.id} (Role: ${role}) onboarding incomplete. Redirecting to /onboarding.`);
           router.push('/onboarding');
         } else {
           console.log(`AuthContext: User ${user.id} (Role: ${role}) onboarding incomplete, but on onboarding page. No redirect.`);
         }
-        return; // Stop further checks if onboarding not complete
+        return; 
       }
 
-      // User has a role AND onboarding is complete. This is a fully set-up user.
+      
       const targetDashboard = role === 'admin' ? '/admin'
                               : role === 'organization' ? '/dashboard/organization'
                               : '/dashboard/volunteer';
 
-      // 1. If on a preliminary page (auth, select-role, onboarding), redirect to target dashboard.
+      
       if (isAuthPage || isSelectRolePage || isOnboardingPage) {
         if (pathname !== targetDashboard) { 
           console.log(`AuthContext: User ${user.id} (Role: ${role}, Onboarded) on preliminary page ${pathname}. Redirecting to ${targetDashboard}.`);
@@ -581,7 +585,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return; 
       }
 
-      // 2. Specific handling for admin role
+      
       if (role === 'admin') {
         if (!isAdminPage && pathname !== targetDashboard) { 
           console.log(`AuthContext: Admin user ${user.id} on non-admin page (${pathname}). Redirecting to ${targetDashboard}.`);
@@ -590,21 +594,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return; 
       }
       
-      // 3. Handle non-admin users (volunteer, organization)
-      if (isAdminPage) { // Non-admin on an admin page
+      
+      if (isAdminPage) { 
         console.log(`AuthContext: Non-admin user ${user.id} attempting to access admin page ${pathname}. Redirecting to ${targetDashboard}.`);
         router.push(targetDashboard);
         return;
       }
       
-      // Redirect from root to dashboard if not already there, AND root isn't their target dashboard
-      if (isRootPage && pathname !== targetDashboard) {
-        console.log(`AuthContext: User ${user.id} (Role: ${role}) on root page. Redirecting to ${targetDashboard}.`);
-        router.push(targetDashboard);
-        return;
-      }
-      
-      // If a user is on a different dashboard page (e.g. volunteer on /dashboard/organization)
+            
       if (pathname.startsWith('/dashboard/') && !pathname.startsWith(targetDashboard)) {
           console.log(`AuthContext: User ${user.id} (Role: ${role}) on incorrect dashboard page ${pathname}. Redirecting to ${targetDashboard}.`);
           router.push(targetDashboard);
@@ -612,10 +609,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
       console.log(`AuthContext: User ${user.id} (Role: ${role}, Onboarded) on ${pathname}. Path is acceptable. No redirect.`);
 
-    } else { // User is not logged in (user is null)
+    } else { 
       console.log('AuthContext: User is not present and not loading.');
       const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/apply', '/chatbot', '/messages', '/onboarding', '/admin'];
-      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage ) { // Removed !isRootPage, public pages should be accessible
+      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage ) { 
          console.log(`AuthProvider: User not logged in. Current path ${pathname} is protected. Redirecting to /login.`);
          router.push('/login');
       } else {
@@ -625,11 +622,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [user, role, loading, router, pathname, signOut]);
 
 
-  if (loading && !isClientHydrated) { // Still loading on server or before client hydration
-    return null; // Render nothing or a minimal server-side loader
+  if (loading && !isClientHydrated) { 
+    return null; 
   }
 
-  if (loading && isClientHydrated) { // Loading on client (e.g., during session restore or auth action)
+  if (loading && isClientHydrated) { 
       return (
          <div className="flex items-center justify-center min-h-screen bg-secondary">
            <Loader2 className="h-12 w-12 animate-spin text-primary" />
