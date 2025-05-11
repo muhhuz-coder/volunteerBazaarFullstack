@@ -2,7 +2,7 @@
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { UserCheck, Building, Search, FileText, Handshake, Users, ListChecks, UserPlus, MessagesSquare, Award } from 'lucide-react';
+import { UserCheck, Building, Search, FileText, Handshake, Users, ListChecks, UserPlus, MessagesSquare, Award, HelpCircle } from 'lucide-react';
 
 // Inline SVG for ShieldCheckIcon if not available elsewhere
 const ShieldCheckIcon = ({ className }: { className?: string }) => (
@@ -35,6 +35,7 @@ export default function HowItWorksPage() {
     { title: "Opportunity Vetting (Future)", description: "While we encourage legitimate postings, we plan to introduce measures to vet opportunities for authenticity." },
     { title: "Reporting Concerns", description: "If you encounter any suspicious activity or inappropriate content, please report it to us immediately through the contact page or a dedicated reporting feature (to be implemented)." },
     { title: "Password Security", description: "Choose a strong, unique password for your VolunteerBazaar account and keep it confidential. Do not share your password with anyone." },
+    { title: "Earning Badges", description: "Badges are awarded automatically for various achievements, such as logging specific numbers of volunteer hours (e.g., 10 Hour Hero, 25 Hour Champion, 50 Hour Superstar, 100 Hour Legend). Keep an eye on your dashboard for new badges!" },
   ];
 
 
@@ -144,3 +145,4 @@ export default function HowItWorksPage() {
     </div>
   );
 }
+
