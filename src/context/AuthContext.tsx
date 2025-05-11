@@ -3,11 +3,9 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Skeleton } from '@/components/ui/skeleton'; // Not used in current snippet, but ensure imports are correct
 import { Loader2 } from 'lucide-react';
 
 // Import types/interfaces
-// ... (keep existing type imports) ...
 import type { VolunteerApplication } from '@/services/job-board';
 import type { Conversation } from '@/services/messaging';
 import type { VolunteerStats } from '@/services/gamification';
@@ -24,7 +22,6 @@ import {
     suspendUserAccount as suspendUserAccountAction,
     unsuspendUserAccount as unsuspendUserAccountAction,
 } from '@/actions/auth-actions';
-// ... (keep other action imports) ...
 import {
     acceptVolunteerApplication,
     rejectVolunteerApplication,
@@ -100,50 +97,61 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Define signOut and other useCallback functions BEFORE useEffect hooks that use them.
   const signOut = useCallback(async () => {
     console.log('AuthContext: Signing out');
     setLoading(true);
     setUser(null);
     setRole(null);
     sessionStorage.removeItem('loggedInUser');
-    await sleep(100);
+    await sleep(100); // Short delay to ensure state updates propagate if needed
     setLoading(false);
     router.push('/login');
     console.log('AuthContext: Sign out complete, redirected to /login');
   }, [router]);
 
   const signIn = useCallback(async (email: string, pass: string): Promise<{ success: boolean; message: string; user?: UserProfile | null }> => {
+    let success = false;
+    let message = '';
+    let finalUser: UserProfile | null = null;
+
     console.log('AuthContext: Attempting sign in for:', email);
     setLoading(true);
     try {
         const result = await signInUserAction(email, pass);
         if (result.success && result.user) {
             if (result.user.isSuspended) {
-                setUser(null);
-                setRole(null);
-                sessionStorage.removeItem('loggedInUser');
-                console.log('AuthContext: Sign in attempt for suspended user:', result.user.id);
-                return { success: false, message: 'Your account has been suspended. Please contact support.', user: null };
+                message = 'Your account has been suspended. Please contact support.';
+            } else {
+                finalUser = result.user;
+                success = true;
+                message = result.message;
+                console.log('AuthContext: Sign in action successful. User data prepared.', {id: result.user.id, role: result.user.role });
             }
-            setUser(result.user);
-            setRole(result.user.role);
-            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
-            console.log('AuthContext: Sign in successful. User and role set.', {id: result.user.id, role: result.user.role });
-            return { success: true, message: result.message, user: result.user };
         } else {
-            console.log('AuthContext: Sign in failed via server action:', result.message);
-            return { success: false, message: result.message || 'Invalid credentials.', user: null };
+            message = result.message || 'Invalid credentials.';
         }
     } catch (error: any) {
+        message = error.message || 'An unexpected error occurred during login.';
         console.error("AuthContext: Sign in process failed:", error);
-        return { success: false, message: error.message || 'An unexpected error occurred during login.', user: null };
     } finally {
+        if (success && finalUser) {
+            setUser(finalUser);
+            setRole(finalUser.role);
+            sessionStorage.setItem('loggedInUser', JSON.stringify(finalUser));
+        } else {
+            setUser(null);
+            setRole(null);
+            sessionStorage.removeItem('loggedInUser');
+        }
         setLoading(false);
     }
+    return { success, message, user: finalUser };
   }, []);
 
   const signUp = useCallback(async (email: string, pass: string, name: string, roleToSet: UserRole): Promise<{ success: boolean; message: string; user?: UserProfile | null }> => {
+    let success = false;
+    let message = '';
+    let finalUser: UserProfile | null = null;
     console.log('AuthContext: Attempting sign up for:', email, 'with role:', roleToSet);
     if (!roleToSet) {
         return { success: false, message: 'Role is required for signup.', user: null };
@@ -152,26 +160,37 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
         const result = await signUpUserAction(email, pass, name, roleToSet);
         if (result.success && result.user) {
-            setUser(result.user);
-            setRole(result.user.role);
-            sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
+            finalUser = result.user;
+            success = true;
+            message = result.message;
             console.log('AuthContext: Sign up successful.', {id: result.user.id, role: result.user.role, onboardingCompleted: result.user.onboardingCompleted });
-            return { success: true, message: result.message, user: result.user };
         } else {
+            message = result.message || 'Signup failed.';
             console.log('AuthContext: Sign up failed:', result.message);
-            return { success: false, message: result.message || 'Signup failed.', user: null };
         }
     } catch (error: any) {
+        message = error.message || 'An unexpected error occurred during signup.';
         console.error("AuthContext: Sign up process failed:", error);
-        return { success: false, message: error.message || 'An unexpected error occurred during signup.', user: null };
     } finally {
+        if (success && finalUser) {
+            setUser(finalUser);
+            setRole(finalUser.role);
+            sessionStorage.setItem('loggedInUser', JSON.stringify(finalUser));
+        } else {
+            setUser(null);
+            setRole(null);
+            sessionStorage.removeItem('loggedInUser');
+        }
         setLoading(false);
     }
+    return { success, message, user: finalUser };
   }, []);
 
   const setRoleAndUpdateUser = useCallback(async (roleToSet: UserRole): Promise<{ success: boolean; message: string }> => {
      if (!user) return { success: false, message: 'User not logged in.' };
      if (!roleToSet) return { success: false, message: 'Invalid role selected.' };
+     let success = false;
+     let message = '';
      setLoading(true);
      try {
         const result = await updateUserRole(user.id, roleToSet);
@@ -180,19 +199,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             setRole(result.user.role);
             sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
             console.log(`AuthContext: Role updated to ${roleToSet} for user ${user.id}.`);
-            return { success: true, message: result.message };
+            success = true;
+            message = result.message;
         } else {
-            return { success: false, message: result.message || 'Failed to update role.'};
+            message = result.message || 'Failed to update role.';
         }
      } catch (error: any) {
-        return { success: false, message: error.message || 'Failed to update role.'};
+        message = error.message || 'Failed to update role.';
      } finally {
         setLoading(false);
      }
+     return { success, message };
    }, [user]);
 
    const updateProfilePicture = useCallback(async (imageDataUri: string): Promise<{ success: boolean; message: string; user?: UserProfile | null }> => {
-     if (!user) return { success: false, message: 'User not logged in.' };
+     if (!user) return { success: false, message: 'User not logged in.', user: null };
      setLoading(true);
      try {
        const result = await updateUserProfilePictureAction(user.id, imageDataUri);
@@ -200,9 +221,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
          setUser(result.user);
          sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
          return { success: true, message: result.message, user: result.user };
-       } else {
-         return { success: false, message: result.message || 'Failed to update profile picture.', user: null };
        }
+       return { success: false, message: result.message || 'Failed to update profile picture.', user: null };
      } catch (error: any) {
        return { success: false, message: error.message || 'Failed to update profile picture.', user: null };
      } finally {
@@ -211,18 +231,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
    }, [user]);
 
   const updateUserProfile = useCallback(async (profileData: Partial<Pick<UserProfile, 'displayName' | 'bio' | 'skills' | 'causes' | 'onboardingCompleted'>>): Promise<{ success: boolean; message: string; user?: UserProfile | null }> => {
-    if (!user) return { success: false, message: 'User not logged in.' };
+    if (!user) return { success: false, message: 'User not logged in.', user: null };
     setLoading(true);
     try {
       const result = await updateUserProfileBioSkillsCausesAction(user.id, profileData);
       if (result.success && result.user) {
         setUser(result.user);
-        setRole(result.user.role);
+        setRole(result.user.role); // Role might not change, but good to keep consistent
         sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
         return { success: true, message: result.message, user: result.user };
-      } else {
-        return { success: false, message: result.message || 'Failed to update profile.', user: null };
       }
+      return { success: false, message: result.message || 'Failed to update profile.', user: null };
     } catch (error: any) {
       return { success: false, message: error.message || 'Failed to update profile.', user: null };
     } finally {
@@ -233,8 +252,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; message: string }> => {
     setLoading(true);
     try {
-        const result = await sendPasswordResetEmailAction(email);
-        return result;
+        return await sendPasswordResetEmailAction(email);
     } catch (error: any) {
         return { success: false, message: error.message || "Failed to send password reset email." };
     } finally {
@@ -253,11 +271,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
              }
              return { success: true, newStats: result.newStats };
-         } else {
-             return { success: false, newStats: null };
          }
+         return { success: false, newStats: null, message: result.message };
        } catch (error: any) {
-           return { success: false, newStats: null };
+           return { success: false, newStats: null, message: error.message };
        }
    }, [user]);
 
@@ -271,11 +288,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                   sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
               }
               return { success: true, newStats: result.newStats };
-          } else {
-               return { success: false, newStats: null };
           }
+          return { success: false, newStats: null, message: result.message };
         } catch (error: any) {
-            return { success: false, newStats: null };
+            return { success: false, newStats: null, message: error.message };
         }
     }, [user]);
 
@@ -289,11 +305,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                     sessionStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
                 }
                 return { success: true, newStats: result.newStats };
-            } else {
-                return { success: false, newStats: null };
             }
+            return { success: false, newStats: null, message: result.message };
         } catch (error: any) {
-            return { success: false, newStats: null };
+            return { success: false, newStats: null, message: error.message };
         }
     }, [user]);
 
@@ -307,9 +322,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (submitResult.success) {
         await addPointsAndUpdateContext(user.id, 5, `Applied for opportunity: ${applicationData.opportunityTitle}`);
         return { success: true, message: submitResult.message };
-      } else {
-         return { success: false, message: submitResult.message || 'Application submission failed.' };
       }
+      return { success: false, message: submitResult.message || 'Application submission failed.' };
     } catch (error: any) {
       return { success: false, message: error.message || 'Application submission failed.' };
     } finally {
@@ -319,12 +333,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const acceptApplication = useCallback(async (applicationId: string, volunteerId: string): Promise<{ success: boolean; message: string; conversationId?: string, updatedApp?: VolunteerApplication | null }> => {
      if (!user || user.role !== 'organization') {
-       return { success: false, message: 'Only logged-in organizations can accept applications.' };
+       return { success: false, message: 'Only logged-in organizations can accept applications.', updatedApp: null };
      }
      setLoading(true);
      try {
-        const result = await acceptVolunteerApplication(applicationId, volunteerId, user.id, user.displayName);
-        return result;
+        return await acceptVolunteerApplication(applicationId, volunteerId, user.id, user.displayName);
      } catch (error: any) {
        return { success: false, message: error.message || 'Failed to accept application.', updatedApp: null };
      } finally {
@@ -334,12 +347,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const rejectApplication = useCallback(async (applicationId: string): Promise<{ success: boolean; message: string; updatedApp?: VolunteerApplication | null }> => {
        if (!user || user.role !== 'organization') {
-           return { success: false, message: 'Only logged-in organizations can reject applications.' };
+           return { success: false, message: 'Only logged-in organizations can reject applications.', updatedApp: null };
        }
        setLoading(true);
        try {
-           const result = await rejectVolunteerApplication(applicationId);
-           return result;
+           return await rejectVolunteerApplication(applicationId);
        } catch (error: any) {
            return { success: false, message: error.message || 'Failed to reject application.', updatedApp: null };
        } finally {
@@ -356,12 +368,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
     ): Promise<{ success: boolean; message: string; updatedApplication?: VolunteerApplication | null }> => {
         if (!user || user.role !== 'organization') {
-            return { success: false, message: 'Only organizations can record performance.' };
+            return { success: false, message: 'Only organizations can record performance.', updatedApplication: null };
         }
         setLoading(true);
         try {
-            const result = await recordVolunteerPerformanceAction(applicationId, performanceData);
-            return result;
+            return await recordVolunteerPerformanceAction(applicationId, performanceData);
         } catch (error: any) {
             return { success: false, message: error.message || 'Failed to record performance.', updatedApplication: null };
         } finally {
@@ -374,6 +385,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
           return await getUserConversationsAction(user.id, user.role);
         } catch (error: any) {
+          console.error("AuthContext: Error fetching user conversations:", error);
           return [];
         }
       }, [user]);
@@ -441,8 +453,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!user) return { success: false, message: 'User not logged in.' };
     setLoading(true);
     try {
-      const result = await submitReportUserAction(user.id, user.displayName, reportedUserId, reason, details);
-      return result;
+      return await submitReportUserAction(user.id, user.displayName, reportedUserId, reason, details);
     } catch (error: any) {
       return { success: false, message: error.message || 'Failed to submit report.' };
     } finally {
@@ -450,8 +461,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [user]);
 
-
-  // useEffect hook for session restoration
   useEffect(() => {
     setIsClientHydrated(true);
     const restoreSession = async () => {
@@ -461,28 +470,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (storedUser) {
             try {
                 const parsedUser: UserProfile = JSON.parse(storedUser);
-                setUser(parsedUser);
-                setRole(parsedUser.role);
-                console.log('AuthProvider: Restored basic user session from sessionStorage.', {id: parsedUser.id, role: parsedUser.role});
-
+                
                 if (parsedUser.isSuspended) {
-                    console.log('AuthProvider: User account is suspended. Clearing session.');
+                    console.log('AuthProvider: User account is suspended from stored data. Clearing session.');
                     sessionStorage.removeItem('loggedInUser');
-                    setUser(null);
-                    setRole(null);
+                    setUser(null); setRole(null);
                     router.push('/login?error=suspended');
-                    setLoading(false);
-                    return;
+                    setLoading(false); return;
                 }
+
+                setUser(parsedUser); setRole(parsedUser.role);
+                console.log('AuthProvider: Restored basic user session from sessionStorage.', {id: parsedUser.id, role: parsedUser.role});
 
                 const refreshResult = await getRefreshedUserAction(parsedUser.id);
                 if (refreshResult.success && refreshResult.user) {
                     if (refreshResult.user.isSuspended) {
                         console.log('AuthProvider: User account is suspended (checked on refresh). Clearing session.');
                         sessionStorage.removeItem('loggedInUser');
-                        setUser(null);
-                        setRole(null);
-                        router.push('/login?error=suspended');
+                        setUser(null); setRole(null);
+                        router.push('/login?error=suspended_on_refresh');
                     } else {
                         setUser(refreshResult.user);
                         setRole(refreshResult.user.role);
@@ -490,22 +496,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                         console.log('AuthProvider: Successfully refreshed user session from server.', {id: refreshResult.user.id, role: refreshResult.user.role});
                     }
                 } else {
-                    console.warn('AuthProvider: Failed to refresh user session from server. Using stored data. This might happen if user was deleted.', refreshResult.message);
+                    console.warn('AuthProvider: Failed to refresh user session. Using stored data or logging out.', refreshResult.message);
                     sessionStorage.removeItem('loggedInUser');
-                    setUser(null);
-                    setRole(null);
+                    setUser(null); setRole(null);
                     router.push('/login?error=session_expired');
                 }
             } catch (e) {
                 console.error("AuthProvider: Error processing stored user session.", e);
                 sessionStorage.removeItem('loggedInUser');
-                setUser(null);
-                setRole(null);
+                setUser(null); setRole(null);
             }
         } else {
             console.log('AuthProvider: No user session found in sessionStorage.');
-            setUser(null);
-            setRole(null);
+            setUser(null); setRole(null);
         }
         setLoading(false);
     };
@@ -514,9 +517,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } else {
         setLoading(false);
     }
-  }, [router]); // Added router to dependencies as it's used inside
+  }, [router]);
 
-  // useEffect hook for redirection logic
   useEffect(() => {
     console.log('AuthContext redirection useEffect triggered. State:', {
       loading,
@@ -535,58 +537,99 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const isAdminPage = pathname.startsWith('/admin');
     const isRootPage = pathname === '/';
 
-    if (user) {
+    if (user) { // User is logged in
       if (user.isSuspended) {
-        if (pathname !== '/login') {
+        if (pathname !== '/login') { // If already on login, no need to push again
             console.log(`AuthContext: User ${user.id} is suspended. Logging out and redirecting to /login.`);
-            signOut(); // This will clear session and redirect to login.
+            signOut(); // This will clear session and push to /login
         }
-        return;
+        return; // Stop further processing if suspended
       }
 
-      console.log(`AuthContext: User ${user.id} is present and not loading.`);
-      if (role) {
-        if (role === 'admin') {
-            if (!isAdminPage && !isAuthPage) {
-                 console.log(`AuthContext: Admin user ${user.id} on non-admin page (${pathname}). Redirecting to /admin.`);
-                 router.push('/admin');
-            } else {
-                 console.log(`AuthContext: Admin user ${user.id} on ${pathname}. No redirect needed.`);
-            }
-        } else if (user.onboardingCompleted === false && !isOnboardingPage && !isSelectRolePage && !isAdminPage) {
-          console.log(`AuthContext: User ${user.id} (Role: ${role}) onboarding not complete. Current path ${pathname}. Redirecting to /onboarding.`);
-          router.push('/onboarding');
-        } else if (user.onboardingCompleted && (isAuthPage || isSelectRolePage || (isAdminPage && role !== 'admin'))) {
-          const targetDashboard = role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer';
-          console.log(`AuthContext: User ${user.id} (Role: ${role}, Onboarded: ${user.onboardingCompleted}) is on ${pathname}. Redirecting to ${targetDashboard}.`);
-          router.push(targetDashboard);
+      if (!role) { // User logged in but no role assigned yet
+        if (!isSelectRolePage && !isOnboardingPage && !isAdminPage) { // Prevent redirect loops
+          console.log(`AuthContext: User ${user.id} has no role. Current path ${pathname}. Redirecting to /select-role.`);
+          router.push('/select-role');
         } else {
-          console.log(`AuthContext: User ${user.id} (Role: ${role}, Onboarded: ${user.onboardingCompleted}) on ${pathname}. No automatic redirect needed from this branch.`);
+          console.log(`AuthContext: User ${user.id} has no role, but on an allowed page ${pathname}. No redirect.`);
         }
-      } else if (!isSelectRolePage && !isOnboardingPage && !isAdminPage) {
-        console.log(`AuthContext: User ${user.id} has no role. Current path ${pathname}. Redirecting to /select-role.`);
-        router.push('/select-role');
-      } else {
-        console.log(`AuthContext: User ${user.id} has no role, but is on ${pathname} (select-role, onboarding, or admin page). No redirect needed.`);
+        return; // Stop further checks if no role
       }
-    } else {
+
+      // User has a role
+      if (user.onboardingCompleted === false) { // Onboarding not complete
+        if (!isOnboardingPage) { // If not already on onboarding page
+          console.log(`AuthContext: User ${user.id} (Role: ${role}) onboarding incomplete. Redirecting to /onboarding.`);
+          router.push('/onboarding');
+        } else {
+          console.log(`AuthContext: User ${user.id} (Role: ${role}) onboarding incomplete, but on onboarding page. No redirect.`);
+        }
+        return; // Stop further checks if onboarding not complete
+      }
+
+      // User has a role AND onboarding is complete. This is a fully set-up user.
+      const targetDashboard = role === 'admin' ? '/admin'
+                              : role === 'organization' ? '/dashboard/organization'
+                              : '/dashboard/volunteer';
+
+      // 1. If on a preliminary page (auth, select-role, onboarding), redirect to target dashboard.
+      if (isAuthPage || isSelectRolePage || isOnboardingPage) {
+        if (pathname !== targetDashboard) { 
+          console.log(`AuthContext: User ${user.id} (Role: ${role}, Onboarded) on preliminary page ${pathname}. Redirecting to ${targetDashboard}.`);
+          router.push(targetDashboard);
+        }
+        return; 
+      }
+
+      // 2. Specific handling for admin role
+      if (role === 'admin') {
+        if (!isAdminPage && pathname !== targetDashboard) { 
+          console.log(`AuthContext: Admin user ${user.id} on non-admin page (${pathname}). Redirecting to ${targetDashboard}.`);
+          router.push(targetDashboard);
+        }
+        return; 
+      }
+      
+      // 3. Handle non-admin users (volunteer, organization)
+      if (isAdminPage) { // Non-admin on an admin page
+        console.log(`AuthContext: Non-admin user ${user.id} attempting to access admin page ${pathname}. Redirecting to ${targetDashboard}.`);
+        router.push(targetDashboard);
+        return;
+      }
+      
+      // Redirect from root to dashboard if not already there, AND root isn't their target dashboard
+      if (isRootPage && pathname !== targetDashboard) {
+        console.log(`AuthContext: User ${user.id} (Role: ${role}) on root page. Redirecting to ${targetDashboard}.`);
+        router.push(targetDashboard);
+        return;
+      }
+      
+      // If a user is on a different dashboard page (e.g. volunteer on /dashboard/organization)
+      if (pathname.startsWith('/dashboard/') && !pathname.startsWith(targetDashboard)) {
+          console.log(`AuthContext: User ${user.id} (Role: ${role}) on incorrect dashboard page ${pathname}. Redirecting to ${targetDashboard}.`);
+          router.push(targetDashboard);
+          return;
+      }
+      console.log(`AuthContext: User ${user.id} (Role: ${role}, Onboarded) on ${pathname}. Path is acceptable. No redirect.`);
+
+    } else { // User is not logged in (user is null)
       console.log('AuthContext: User is not present and not loading.');
       const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/apply', '/chatbot', '/messages', '/onboarding', '/admin'];
-      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage && !isRootPage) {
+      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage ) { // Removed !isRootPage, public pages should be accessible
          console.log(`AuthProvider: User not logged in. Current path ${pathname} is protected. Redirecting to /login.`);
          router.push('/login');
       } else {
-        console.log(`AuthContext: User not present, not loading. Path ${pathname} is not protected, an auth page, or root. No redirect.`);
+        console.log(`AuthContext: User not present, not loading. Path ${pathname}. No redirect for unauthenticated user here.`);
       }
     }
   }, [user, role, loading, router, pathname, signOut]);
 
 
-  if (loading && !isClientHydrated) {
-    return null;
+  if (loading && !isClientHydrated) { // Still loading on server or before client hydration
+    return null; // Render nothing or a minimal server-side loader
   }
 
-  if (loading && isClientHydrated) {
+  if (loading && isClientHydrated) { // Loading on client (e.g., during session restore or auth action)
       return (
          <div className="flex items-center justify-center min-h-screen bg-secondary">
            <Loader2 className="h-12 w-12 animate-spin text-primary" />
