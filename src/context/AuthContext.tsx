@@ -20,6 +20,8 @@ import {
     updateUserProfilePictureAction,
     updateUserProfileBioSkillsCauses as updateUserProfileBioSkillsCausesAction,
     sendPasswordResetEmailAction,
+    suspendUserAccount as suspendUserAccountAction, // Import suspend action
+    unsuspendUserAccount as unsuspendUserAccountAction, // Import unsuspend action
 } from '@/actions/auth-actions';
 import {
     acceptVolunteerApplication,
@@ -32,7 +34,7 @@ import { getUserConversationsAction, startConversationAction } from '@/actions/m
 import { blockUserAction, unblockUserAction, reportUserAction as submitReportUserAction } from '@/actions/user-actions'; // New user actions
 
 
-export type UserRole = 'volunteer' | 'organization' | null;
+export type UserRole = 'volunteer' | 'organization' | 'admin' | null; // Added 'admin' role
 
 export interface UserProfile {
   id: string;
@@ -78,6 +80,9 @@ interface AuthContextType {
   blockUser: (userIdToBlock: string) => Promise<{ success: boolean; message: string; updatedUser?: UserProfile | null }>;
   unblockUser: (userIdToUnblock: string) => Promise<{ success: boolean; message: string; updatedUser?: UserProfile | null }>;
   reportUser: (reportedUserId: string, reason: string, details?: string) => Promise<{ success: boolean; message: string }>;
+  // Admin actions (if needed directly in context, otherwise call from admin panel)
+  // suspendUser: (userIdToSuspend: string) => Promise<{ success: boolean; message: string }>;
+  // unsuspendUser: (userIdToUnsuspend: string) => Promise<{ success: boolean; message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -171,43 +176,50 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       isSuspended: user?.isSuspended,
     });
 
-    if (loading) return; 
+    if (loading) return;
 
     const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
     const isSelectRolePage = pathname === '/select-role';
     const isOnboardingPage = pathname === '/onboarding';
-    const isRootPage = pathname === '/'; 
+    const isAdminPage = pathname.startsWith('/admin');
+    const isRootPage = pathname === '/';
 
-    if (user) { 
+    if (user) {
       if (user.isSuspended) {
-        if (pathname !== '/login') { // Allow being on login page to see suspended message
+        if (pathname !== '/login') {
             console.log(`AuthContext: User ${user.id} is suspended. Redirecting to /login.`);
-            signOut(); // This will clear session and push to login
+            signOut();
         }
-        return; // Stop further checks if suspended
+        return;
       }
 
       console.log('AuthContext: User is present and not loading.');
-      if (role) { 
-        if (user.onboardingCompleted === false && !isOnboardingPage && !isSelectRolePage) {
+      if (role) {
+        if (role === 'admin') {
+            if (!isAdminPage && !isAuthPage) { // Allow admin to be on auth pages if needed, e.g. to sign out
+                 console.log(`AuthContext: Admin user on non-admin page (${pathname}). Redirecting to /admin.`);
+                 router.push('/admin');
+            }
+        } else if (user.onboardingCompleted === false && !isOnboardingPage && !isSelectRolePage && !isAdminPage) {
           console.log(`AuthContext: User has role ${role} but onboarding not complete. Redirecting to /onboarding.`);
           router.push('/onboarding');
-        } else if (user.onboardingCompleted && (isAuthPage || isSelectRolePage)) {
+        } else if (user.onboardingCompleted && (isAuthPage || isSelectRolePage || (isAdminPage && role !== 'admin'))) {
+          // If onboarded and on auth/select-role, or on admin page but not admin, redirect to their dashboard
           const targetDashboard = role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer';
-          console.log(`AuthContext: User is onboarded and on ${pathname}. Redirecting to ${targetDashboard}.`);
+          console.log(`AuthContext: User is onboarded and on ${pathname} (or admin page as non-admin). Redirecting to ${targetDashboard}.`);
           router.push(targetDashboard);
         } else {
           console.log(`AuthContext: User is on ${pathname}. Onboarding status: ${user.onboardingCompleted}. Role: ${role}. No automatic redirect needed from here.`);
         }
-      } else if (!isSelectRolePage && !isOnboardingPage) { 
+      } else if (!isSelectRolePage && !isOnboardingPage && !isAdminPage) {
         console.log(`AuthContext: User has no role. Current path ${pathname}. Redirecting to /select-role.`);
         router.push('/select-role');
       } else {
-        console.log(`AuthContext: User has no role, but is already on /select-role or /onboarding. No redirect needed.`);
+        console.log(`AuthContext: User has no role, but is already on /select-role, /onboarding, or /admin (will be handled). No redirect needed.`);
       }
-    } else { 
+    } else {
       console.log('AuthContext: User is not present and not loading.');
-      const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/apply', '/chatbot', '/messages', '/onboarding'];
+      const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/apply', '/chatbot', '/messages', '/onboarding', '/admin'];
       if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage && !isRootPage) {
          console.log(`AuthProvider: User not logged in. Current path ${pathname} is protected. Redirecting to /login.`);
          router.push('/login');
@@ -280,8 +292,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
     setRole(null);
     sessionStorage.removeItem('loggedInUser');
-    await sleep(100); 
-    setLoading(false); 
+    await sleep(100);
+    setLoading(false);
     router.push('/login');
     console.log('AuthContext: Sign out complete, redirected to /login');
   }, [router]);
@@ -334,7 +346,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const result = await updateUserProfileBioSkillsCausesAction(user.id, profileData);
       if (result.success && result.user) {
         setUser(result.user);
-        setRole(result.user.role); 
+        setRole(result.user.role);
         sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
         return { success: true, message: result.message, user: result.user };
       } else {
@@ -570,11 +582,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [user]);
 
+  // Logic for suspending/unsuspending users, typically called from an admin panel
+  // const suspendUser = useCallback(async (userIdToSuspend: string): Promise<{ success: boolean; message: string }> => {
+  //   if (!user || user.role !== 'admin') { // Ensure only admin can perform this
+  //     return { success: false, message: 'Unauthorized action.' };
+  //   }
+  //   return await suspendUserAccountAction(userIdToSuspend, user.id);
+  // }, [user]);
+
+  // const unsuspendUser = useCallback(async (userIdToUnsuspend: string): Promise<{ success: boolean; message: string }> => {
+  //   if (!user || user.role !== 'admin') { // Ensure only admin can perform this
+  //     return { success: false, message: 'Unauthorized action.' };
+  //   }
+  //   return await unsuspendUserAccountAction(userIdToUnsuspend, user.id);
+  // }, [user]);
+
 
   if (loading && !isClientHydrated) {
     return null; // Render nothing on server during initial auth check to prevent hydration mismatch
   }
-  
+
   if (loading && isClientHydrated) {
       return (
          <div className="flex items-center justify-center min-h-screen bg-secondary">
@@ -608,6 +635,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         blockUser,
         unblockUser,
         reportUser,
+        // suspendUser,
+        // unsuspendUser,
      }}>
       {children}
     </AuthContext.Provider>

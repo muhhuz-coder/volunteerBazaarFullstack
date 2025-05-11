@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, Users, Home, Settings } from 'lucide-react'; 
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, Users, Home, Settings, ShieldAlert } from 'lucide-react'; 
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,7 +40,8 @@ export function Header() {
     return name.length > 0 ? name[0].toUpperCase() : 'U';
   };
 
-  const dashboardPath = role === 'organization' ? '/dashboard/organization'
+  const dashboardPath = role === 'admin' ? '/admin'
+                      : role === 'organization' ? '/dashboard/organization'
                       : role === 'volunteer' ? '/dashboard/volunteer'
                       : '/select-role'; 
 
@@ -53,17 +54,15 @@ export function Header() {
      { href: "/contact", label: "Contact", icon: Mail },
    ];
 
-   const navLinks = user
-     ? [
-         { href: "/", label: "Home", icon: Home },
-         { href: "/opportunities", label: "Opportunities", icon: Search }, 
-         { href: "/volunteers", label: "Volunteers", icon: Users },
-         { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
-         { href: "/about", label: "About Us", icon: Info },
-         { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
-         { href: "/contact", label: "Contact", icon: Mail },
-       ]
-     : baseNavLinks;
+   let navLinks = [...baseNavLinks]; // Start with base links
+
+   if (user) {
+     // Add links specific to logged-in users
+     navLinks.splice(3, 0, { href: "/dashboard/messages", label: "Messages", icon: MessageSquare }); // Insert Messages
+     if (role === 'admin') {
+         navLinks.push({ href: "/admin", label: "Admin Panel", icon: ShieldAlert });
+     }
+   }
 
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);

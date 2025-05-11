@@ -1,4 +1,3 @@
-
 // src/actions/auth-actions.ts
 'use server';
 
@@ -73,7 +72,7 @@ export async function signUpUser(email: string, pass: string, name: string, role
       console.log('Server Action: Sign up failed, email exists:', email);
       return { success: false, message: 'Email already in use.', user: null };
     }
-    const userId = roleToSet === 'organization' ? `org_${Date.now()}` : `vol_${Date.now()}`;
+    const userId = roleToSet === 'organization' ? `org_${Date.now()}` : (roleToSet === 'admin' ? `adm_${Date.now()}` : `vol_${Date.now()}`);
     const newUser: UserProfile = {
       id: userId,
       email: email,
@@ -284,67 +283,74 @@ export async function sendPasswordResetEmailAction(email: string): Promise<{ suc
   return { success: true, message: "If your email is registered, a password reset link has been sent (mock)." };
 }
 
-// New action to set user as suspended (intended for admin use, not exposed to client directly in this iteration)
+// New action to set user as suspended (intended for admin use)
 export async function suspendUserAccount(userIdToSuspend: string, adminUserId: string): Promise<{ success: boolean; message: string }> {
-    // In a real app, verify adminUserId has rights
     console.log(`Admin Action: Attempting to suspend user ${userIdToSuspend} by admin ${adminUserId}`);
-    try {
-        const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
-        const usersData = objectToMap(usersObject);
-        let userEmailKey: string | undefined;
-        let userToSuspend: UserProfile | undefined;
+    const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+    const usersData = objectToMap(usersObject);
 
-        for (const [email, profile] of usersData.entries()) {
-            if (profile.id === userIdToSuspend) {
-                userEmailKey = email;
-                userToSuspend = profile;
-                break;
-            }
-        }
-
-        if (!userToSuspend || !userEmailKey) {
-            return { success: false, message: 'User to suspend not found.' };
-        }
-
-        userToSuspend.isSuspended = true;
-        usersData.set(userEmailKey, userToSuspend);
-        await writeData(USERS_FILE, mapToObject(usersData));
-        console.log(`Admin Action: User ${userIdToSuspend} has been suspended.`);
-        return { success: true, message: 'User account suspended successfully.' };
-    } catch (error: any) {
-        console.error(`Admin Action: Error suspending user ${userIdToSuspend}:`, error);
-        return { success: false, message: 'Server error during account suspension.' };
+    // Verify admin privileges
+    const adminUser = Array.from(usersData.values()).find(u => u.id === adminUserId);
+    if (!adminUser || adminUser.role !== 'admin') {
+        return { success: false, message: 'Unauthorized action. Admin privileges required.' };
     }
+    
+    let userEmailKey: string | undefined;
+    let userToSuspend: UserProfile | undefined;
+
+    for (const [email, profile] of usersData.entries()) {
+        if (profile.id === userIdToSuspend) {
+            userEmailKey = email;
+            userToSuspend = profile;
+            break;
+        }
+    }
+
+    if (!userToSuspend || !userEmailKey) {
+        return { success: false, message: 'User to suspend not found.' };
+    }
+
+    if (userToSuspend.role === 'admin') {
+        return { success: false, message: 'Cannot suspend an admin account.' };
+    }
+
+    userToSuspend.isSuspended = true;
+    usersData.set(userEmailKey, userToSuspend);
+    await writeData(USERS_FILE, mapToObject(usersData));
+    console.log(`Admin Action: User ${userIdToSuspend} has been suspended.`);
+    return { success: true, message: 'User account suspended successfully.' };
 }
 
-// New action to unsuspend a user account
+// New action to unsuspend a user account (intended for admin use)
 export async function unsuspendUserAccount(userIdToUnsuspend: string, adminUserId: string): Promise<{ success: boolean; message: string }> {
     console.log(`Admin Action: Attempting to unsuspend user ${userIdToUnsuspend} by admin ${adminUserId}`);
-    try {
-        const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
-        const usersData = objectToMap(usersObject);
-        let userEmailKey: string | undefined;
-        let userToUnsuspend: UserProfile | undefined;
+    const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+    const usersData = objectToMap(usersObject);
 
-        for (const [email, profile] of usersData.entries()) {
-            if (profile.id === userIdToUnsuspend) {
-                userEmailKey = email;
-                userToUnsuspend = profile;
-                break;
-            }
-        }
-
-        if (!userToUnsuspend || !userEmailKey) {
-            return { success: false, message: 'User to unsuspend not found.' };
-        }
-
-        userToUnsuspend.isSuspended = false;
-        usersData.set(userEmailKey, userToUnsuspend);
-        await writeData(USERS_FILE, mapToObject(usersData));
-        console.log(`Admin Action: User ${userIdToUnsuspend} has been unsuspended.`);
-        return { success: true, message: 'User account unsuspended successfully.' };
-    } catch (error: any) {
-        console.error(`Admin Action: Error unsuspending user ${userIdToUnsuspend}:`, error);
-        return { success: false, message: 'Server error during account unsuspension.' };
+     // Verify admin privileges
+    const adminUser = Array.from(usersData.values()).find(u => u.id === adminUserId);
+    if (!adminUser || adminUser.role !== 'admin') {
+        return { success: false, message: 'Unauthorized action. Admin privileges required.' };
     }
+
+    let userEmailKey: string | undefined;
+    let userToUnsuspend: UserProfile | undefined;
+
+    for (const [email, profile] of usersData.entries()) {
+        if (profile.id === userIdToUnsuspend) {
+            userEmailKey = email;
+            userToUnsuspend = profile;
+            break;
+        }
+    }
+
+    if (!userToUnsuspend || !userEmailKey) {
+        return { success: false, message: 'User to unsuspend not found.' };
+    }
+
+    userToUnsuspend.isSuspended = false;
+    usersData.set(userEmailKey, userToUnsuspend);
+    await writeData(USERS_FILE, mapToObject(usersData));
+    console.log(`Admin Action: User ${userIdToUnsuspend} has been unsuspended.`);
+    return { success: true, message: 'User account unsuspended successfully.' };
 }

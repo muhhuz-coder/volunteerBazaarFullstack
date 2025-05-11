@@ -1,4 +1,3 @@
-
 // src/services/user-service.ts
 'use server';
 
@@ -61,7 +60,7 @@ async function getAllUsersWithStats(currentUserId?: string): Promise<UserProfile
                 continue; 
             }
             // If this profile has blocked the current user
-            const currentUserProfile = usersMap.get(currentUserId) || Array.from(usersMap.values()).find(u => u.id === currentUserId); // Find current user by ID if email is not key
+            const currentUserProfile = Array.from(usersMap.values()).find(u => u.id === currentUserId);
             if (currentUserProfile?.blockedUserIds?.includes(userWithStats.id)) {
                 continue;
             }
@@ -232,4 +231,28 @@ export async function submitReport(reportData: Omit<Report, 'id' | 'timestamp' |
     await writeData(REPORTS_FILE, reportsData);
     console.log('User report submitted:', newReport);
     return newReport;
+}
+
+/**
+ * Updates the status of a specific report.
+ * @param reportId The ID of the report to update.
+ * @param status The new status for the report.
+ * @returns The updated report object or null if not found.
+ */
+export async function updateReportStatus(reportId: string, status: Report['status']): Promise<Report | null> {
+    await sleep(100);
+    let reportsData = await loadReportsData();
+    const reportIndex = reportsData.findIndex(report => report.id === reportId);
+
+    if (reportIndex === -1) {
+        console.error(`Report with ID ${reportId} not found for status update.`);
+        return null;
+    }
+
+    reportsData[reportIndex].status = status;
+    reportsData[reportIndex].timestamp = new Date(reportsData[reportIndex].timestamp); // Ensure Date
+
+    await writeData(REPORTS_FILE, reportsData);
+    console.log(`Report ${reportId} status updated to ${status}.`);
+    return { ...reportsData[reportIndex] };
 }

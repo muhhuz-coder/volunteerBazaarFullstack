@@ -11,12 +11,13 @@ import type { NextRequest } from 'next/server';
 // based *only* on the URL path, not actual login state. The client-side checks in
 // dashboard pages are now the main gatekeepers.
 
+// This middleware primarily protects unauthenticated access to dashboard routes
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  // Updated protected paths
-  const protectedPaths = ['/dashboard/volunteer', '/dashboard/organization', '/select-role'];
+  // Updated protected paths, including admin
+  const protectedPaths = ['/dashboard/volunteer', '/dashboard/organization', '/select-role', '/admin'];
   // Updated public paths (apply route structure might change)
-  const publicPaths = ['/', '/login', '/signup', '/apply'];
+  const publicPaths = ['/', '/login', '/signup', '/apply', '/forgot-password']; // Added forgot-password
   const staticFiles = /\.(.*)$/; // Regex to match static file requests
 
   // Allow static files and API routes
@@ -33,18 +34,26 @@ export async function middleware(request: NextRequest) {
    }
 
   // --- Limited Protected Route Check ---
-  // This check is very basic. It assumes if someone is trying to access a dashboard,
-  // they *should* be logged in. If not, redirect to login.
-  // It CANNOT verify *if* they are actually logged in with this simple setup.
+  // This check is very basic. It assumes if someone is trying to access a dashboard or admin area,
+  // they *should* be logged in with the correct role.
+  // It CANNOT verify *if* they are actually logged in or have the correct role with this simple setup.
   const isAccessingProtectedPath = protectedPaths.some(p => pathname.startsWith(p));
 
   if (isAccessingProtectedPath) {
     // In a real app with server-readable sessions (e.g., cookies managed by AuthContext),
     // you would check the session here. Since we can't, we rely on client-side checks.
     // This middleware layer becomes less effective for auth *enforcement* in this simple model.
-    // We could potentially add a dummy cookie on login and check for it, but it's insecure.
     // console.log(`Middleware: Accessing protected path ${pathname}. Relying on client-side auth check.`);
   }
+
+  // Redirect if trying to access /admin without being an admin (very basic check, real check client-side)
+  // This middleware logic is mostly a placeholder for more robust server-side auth.
+  // The actual enforcement will primarily happen in the AuthContext on the client-side.
+  if (pathname.startsWith('/admin')) {
+    // console.log("Middleware: Attempting to access /admin. Client-side check will determine access.");
+    // We can't check role here, so allow through and let client-side redirect.
+  }
+
 
   // Allow all other requests by default; client-side logic handles auth.
   return NextResponse.next();
