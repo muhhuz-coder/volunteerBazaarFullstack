@@ -1,9 +1,8 @@
 
 // src/config/constants.ts
 
-// Example opportunity categories
 export const opportunityCategories = [
-    'All', // Usually for filtering UI, not for assignment
+    'All',
     'Environment',
     'Education',
     'Healthcare',
@@ -15,5 +14,55 @@ export const opportunityCategories = [
     'Technology',
     'Seniors',
     'Youth',
-    'Other', // Add an 'Other' category
+    'Other',
+];
+
+export const commonSkills: string[] = [
+    "Communication",
+    "Teamwork",
+    "Problem Solving",
+    "Leadership",
+    "Organization",
+    "Event Planning",
+    "Fundraising",
+    "Teaching",
+    "Mentoring",
+    "Graphic Design",
+    "Web Development",
+    "Social Media Management",
+    "Writing",
+    "Editing",
+    "Data Entry",
+    "Manual Labor",
+    "Cooking/Baking",
+    "Driving",
+    "First Aid",
+    "Tutoring",
+    "Gardening",
+    "Crafting",
+    "Public Speaking",
+    "Research",
+    "Customer Service",
+];
+
+export const commonCauses: string[] = [
+    "Animal Welfare",
+    "Arts & Culture",
+    "Children & Youth",
+    "Community Development",
+    "Disaster Relief",
+    "Education & Literacy",
+    "Elderly Care",
+    "Environment & Conservation",
+    "Health & Wellness",
+    "Housing & Homelessness",
+    "Human Rights",
+    "Hunger & Food Security",
+    "International Aid",
+    "Poverty Alleviation",
+    "Refugee Support",
+    "Social Justice",
+    "Sports & Recreation",
+    "Technology & Innovation",
+    "Women's Issues",
 ];
