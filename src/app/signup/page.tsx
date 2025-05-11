@@ -25,7 +25,7 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { signUpWithEmail } = useAuth(); // Use signUpWithEmail for local auth
+  const { signUp } = useAuth(); // Use signUp from local auth
   const { toast } = useToast();
 
   // REMOVED: Google Sign-In related state and handlers
@@ -58,7 +58,8 @@ export default function SignupPage() {
     }
 
     try {
-      const result = await signUpWithEmail(email, password, displayName, role);
+      // Use signUp from context instead of signUpWithEmail
+      const result = await signUp(email, password, displayName, role);
 
       if (result.success) {
         toast({
