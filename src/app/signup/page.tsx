@@ -12,8 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserPlus, KeyRound, Mail, Users, Briefcase } from 'lucide-react'; // Added more icons
-import { Separator } from '@/components/ui/separator'; // Added Separator
+import { Loader2, UserPlus, KeyRound, Mail, Users, Briefcase } from 'lucide-react'; 
+import { Separator } from '@/components/ui/separator'; 
 
 
 export default function SignupPage() {
@@ -25,12 +25,8 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { signUp } = useAuth(); // Use signUp from local auth
+  const { signUp } = useAuth(); 
   const { toast } = useToast();
-
-  // REMOVED: Google Sign-In related state and handlers
-  // const [googleLoading, setGoogleLoading] = useState(false);
-
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +54,6 @@ export default function SignupPage() {
     }
 
     try {
-      // Use signUp from context instead of signUpWithEmail
       const result = await signUp(email, password, displayName, role);
 
       if (result.success) {
@@ -66,7 +61,7 @@ export default function SignupPage() {
           title: 'Signup Successful',
           description: 'Your account has been created. Redirecting...',
         });
-        // AuthContext's onAuthStateChanged will handle redirection to /select-role or dashboard
+        // AuthContext will handle redirection
       } else {
         setError(result.message || 'Signup failed.');
         toast({
@@ -87,21 +82,26 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
-
-  // REMOVED: handleGoogleSignUp function
+  
+  const handleGoogleSignUp = () => {
+    toast({
+      title: 'Coming Soon!',
+      description: 'Google Sign-Up will be available in a future update.',
+    });
+  };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary via-background to-secondary p-4">
-      <Card className="w-full max-w-md shadow-xl border overflow-hidden">
-        <CardHeader className="space-y-2 text-center pt-8 pb-6 bg-primary/5">
-          <UserPlus className="mx-auto h-12 w-12 text-primary mb-2" />
-          <CardTitle className="text-3xl font-bold text-primary">Create an Account</CardTitle>
-          <CardDescription className="text-base text-muted-foreground">Join VolunteerBazaar today!</CardDescription>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/20 p-4 selection:bg-primary/20 selection:text-primary">
+      <Card className="w-full max-w-md shadow-2xl border-primary/20 overflow-hidden rounded-xl">
+        <CardHeader className="space-y-2 text-center pt-10 pb-8 bg-gradient-to-b from-primary/5 to-transparent">
+          <UserPlus className="mx-auto h-14 w-14 text-primary mb-3" />
+          <CardTitle className="text-4xl font-bold text-primary tracking-tight">Create an Account</CardTitle>
+          <CardDescription className="text-lg text-muted-foreground pt-1">Join VolunteerBazaar today!</CardDescription>
         </CardHeader>
-        <CardContent className="px-6 pt-6 pb-4">
-          <form onSubmit={handleEmailSignup} className="space-y-5">
-            <div className="grid gap-2">
-              <Label htmlFor="displayName" className="flex items-center gap-2 text-sm">
+        <CardContent className="px-6 md:px-8 pt-8 pb-6">
+          <form onSubmit={handleEmailSignup} className="space-y-6">
+            <div className="grid gap-2.5">
+              <Label htmlFor="displayName" className="flex items-center gap-2 text-sm font-medium text-foreground">
                 {role === 'organization' ? <Briefcase className="h-4 w-4 text-muted-foreground" /> : <Users className="h-4 w-4 text-muted-foreground" />}
                 {role === 'organization' ? 'Organization Name' : 'Full Name'}
               </Label>
@@ -112,11 +112,11 @@ export default function SignupPage() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 required
-                className="bg-background border-border focus:border-primary focus:ring-primary/50 h-10 text-sm"
+                className="bg-background border-border focus:border-primary focus:ring-2 focus:ring-primary/30 h-11 text-base rounded-md"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email" className="flex items-center gap-2 text-sm"><Mail className="h-4 w-4 text-muted-foreground" />Email</Label>
+            <div className="grid gap-2.5">
+              <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium text-foreground"><Mail className="h-4 w-4 text-muted-foreground" />Email Address</Label>
               <Input
                 id="email"
                 type="email"
@@ -124,11 +124,11 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-background border-border focus:border-primary focus:ring-primary/50 h-10 text-sm"
+                className="bg-background border-border focus:border-primary focus:ring-2 focus:ring-primary/30 h-11 text-base rounded-md"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password" className="flex items-center gap-2 text-sm"><KeyRound className="h-4 w-4 text-muted-foreground" />Password</Label>
+            <div className="grid gap-2.5">
+              <Label htmlFor="password" className="flex items-center gap-2 text-sm font-medium text-foreground"><KeyRound className="h-4 w-4 text-muted-foreground" />Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -137,11 +137,11 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="bg-background border-border focus:border-primary focus:ring-primary/50 h-10 text-sm"
+                className="bg-background border-border focus:border-primary focus:ring-2 focus:ring-primary/30 h-11 text-base rounded-md"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="confirmPassword" className="flex items-center gap-2 text-sm"><KeyRound className="h-4 w-4 text-muted-foreground" />Confirm Password</Label>
+            <div className="grid gap-2.5">
+              <Label htmlFor="confirmPassword" className="flex items-center gap-2 text-sm font-medium text-foreground"><KeyRound className="h-4 w-4 text-muted-foreground" />Confirm Password</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -149,68 +149,57 @@ export default function SignupPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="bg-background border-border focus:border-primary focus:ring-primary/50 h-10 text-sm"
+                className="bg-background border-border focus:border-primary focus:ring-2 focus:ring-primary/30 h-11 text-base rounded-md"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="role" className="flex items-center gap-2 text-sm">I am a...</Label>
+            <div className="grid gap-2.5">
+              <Label htmlFor="role" className="flex items-center gap-2 text-sm font-medium text-foreground">I am joining as...</Label>
               <Select
                 value={role || ''}
                 onValueChange={(value) => setRole(value as UserRole)}
                 required
               >
-                <SelectTrigger id="role" className="w-full bg-background border-border focus:border-primary focus:ring-primary/50 h-10 text-sm">
+                <SelectTrigger id="role" className="w-full bg-background border-border focus:border-primary focus:ring-2 focus:ring-primary/30 h-11 text-base rounded-md">
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="volunteer" className="text-sm">Volunteer</SelectItem>
-                  <SelectItem value="organization" className="text-sm">Organization</SelectItem>
+                  <SelectItem value="volunteer" className="text-base">A Volunteer</SelectItem>
+                  <SelectItem value="organization" className="text-base">An Organization</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {error && (
-              <p className="text-sm text-destructive text-center pt-1">{error}</p>
+              <p className="text-sm text-destructive text-center pt-1.5">{error}</p>
             )}
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base font-semibold transition-all duration-300 ease-in-out hover:shadow-lg" disabled={loading}>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base font-semibold rounded-md shadow-md hover:shadow-lg transition-all duration-300 ease-in-out" disabled={loading}>
               {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Signing up...
                 </>
               ) : (
                 <>
-                  <UserPlus className="mr-2 h-4 w-4" /> Sign Up
+                  <UserPlus className="mr-2 h-5 w-5" /> Sign Up
                 </>
               )}
             </Button>
           </form>
 
-          {/* REMOVED: Google Sign-Up Button and Separator Logic
-          <Separator className="my-6" />
+          <Separator className="my-8" />
            <Button 
             variant="outline" 
-            className="w-full py-3 text-base font-semibold border-border hover:bg-muted/50 transition-all duration-300 ease-in-out hover:shadow-lg" 
+            className="w-full py-3 text-base font-semibold border-border hover:bg-muted/50 hover:border-primary/50 rounded-md shadow-sm hover:shadow-md transition-all duration-300 ease-in-out" 
             onClick={handleGoogleSignUp} 
-            disabled={googleLoading || loading}
+            disabled // Keep disabled
           >
-            {googleLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.5 512 0 401.5 0 265.5S110.5 19 244 19c70.5 0 132.5 29.5 177.5 78.5l-67.5 62.5C320.5 134.5 286 112 244 112c-83.5 0-151.5 67.5-151.5 153.5S160.5 419 244 419c52.5 0 96.5-20.5 126-50.5 27-27 43.5-62.5 48.5-107.5H244V261.8h244z"></path></svg>
-                Sign up with Google
-              </>
-            )}
+            <svg className="mr-2.5 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.5 512 0 401.5 0 265.5S110.5 19 244 19c70.5 0 132.5 29.5 177.5 78.5l-67.5 62.5C320.5 134.5 286 112 244 112c-83.5 0-151.5 67.5-151.5 153.5S160.5 419 244 419c52.5 0 96.5-20.5 126-50.5 27-27 43.5-62.5 48.5-107.5H244V261.8h244z"></path></svg>
+            Sign up with Google
           </Button>
-           */}
         </CardContent>
-        <CardFooter className="text-center text-sm pb-8 bg-primary/5 pt-4">
+        <CardFooter className="text-center text-sm pb-10 bg-primary/5 pt-6">
           <p className="text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/login" className="font-semibold text-primary hover:underline">
+            <Link href="/login" className="font-semibold text-primary hover:underline hover:text-accent">
               Login here
             </Link>
           </p>
