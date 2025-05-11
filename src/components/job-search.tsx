@@ -1,6 +1,7 @@
 
 'use client';
 
+import * as React from 'react'; // Added React import
 import { useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
