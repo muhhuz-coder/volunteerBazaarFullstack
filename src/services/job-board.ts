@@ -1,7 +1,7 @@
-
 'use server';
 // src/services/job-board.ts
 import { readData, writeData } from '@/lib/db-utils';
+import { createNotification } from '@/services/notification'; // Import notification service
 
 /**
  * Represents a volunteer opportunity posting.
@@ -21,6 +21,7 @@ export interface Opportunity {
   applicationDeadline?: Date | string; // Optional: Deadline for applications
   eventStartDate?: Date | string; // New: Start date of the event/activity
   eventEndDate?: Date | string; // New: End date of the event/activity
+  updatedAt?: Date | string; // Timestamp for last update
 }
 
 /**
@@ -57,6 +58,7 @@ async function loadOpportunitiesData(): Promise<Opportunity[]> {
     return opportunities.map(opp => ({
         ...opp,
         createdAt: opp.createdAt ? new Date(opp.createdAt) : new Date(0), // Default to epoch if not present
+        updatedAt: opp.updatedAt ? new Date(opp.updatedAt) : (opp.createdAt ? new Date(opp.createdAt) : new Date(0)),
         applicationDeadline: opp.applicationDeadline ? new Date(opp.applicationDeadline) : undefined,
         eventStartDate: opp.eventStartDate ? new Date(opp.eventStartDate) : undefined,
         eventEndDate: opp.eventEndDate ? new Date(opp.eventEndDate) : undefined,
@@ -166,8 +168,8 @@ export async function getOpportunities(
     case 'recent': // Default sort by createdAt descending (newest first)
     default:
       opportunitiesData.sort((a, b) => {
-        const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
-        const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt || 0);
+        const dateA = a.updatedAt instanceof Date ? a.updatedAt : new Date(a.updatedAt || 0);
+        const dateB = b.updatedAt instanceof Date ? b.updatedAt : new Date(b.updatedAt || 0);
         return dateB.getTime() - dateA.getTime();
       });
       break;
@@ -300,13 +302,15 @@ export async function updateApplicationStatus(
 export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>): Promise<Opportunity> {
     await sleep(300);
     let opportunitiesData = await loadOpportunitiesData();
-    const newId = `opp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date();
+    const newId = `opp-${now.getTime()}-${Math.random().toString(36).substring(2, 7)}`;
     const newOpportunity: Opportunity = {
       ...opportunityData,
       id: newId,
       pointsAwarded: typeof opportunityData.pointsAwarded === 'number' && opportunityData.pointsAwarded >= 0 ? opportunityData.pointsAwarded : 0,
       imageUrl: opportunityData.imageUrl || undefined,
-      createdAt: new Date(), // Add createdAt timestamp
+      createdAt: now, 
+      updatedAt: now,
       applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : undefined,
       eventStartDate: opportunityData.eventStartDate ? new Date(opportunityData.eventStartDate) : undefined,
       eventEndDate: opportunityData.eventEndDate ? new Date(opportunityData.eventEndDate) : undefined,
@@ -328,21 +332,107 @@ export async function getOpportunityById(id: string): Promise<Opportunity | unde
     const opportunitiesData = await loadOpportunitiesData();
     const opportunity = opportunitiesData.find(opp => opp.id === id);
     if (opportunity) {
-      if (opportunity.createdAt) {
-        opportunity.createdAt = opportunity.createdAt instanceof Date ? opportunity.createdAt : new Date(opportunity.createdAt);
-      }
-      if (opportunity.applicationDeadline) {
-        opportunity.applicationDeadline = opportunity.applicationDeadline instanceof Date ? opportunity.applicationDeadline : new Date(opportunity.applicationDeadline);
-      }
-      if (opportunity.eventStartDate) {
-        opportunity.eventStartDate = opportunity.eventStartDate instanceof Date ? opportunity.eventStartDate : new Date(opportunity.eventStartDate);
-      }
-      if (opportunity.eventEndDate) {
-        opportunity.eventEndDate = opportunity.eventEndDate instanceof Date ? opportunity.eventEndDate : new Date(opportunity.eventEndDate);
-      }
+      // Ensure dates are Date objects
+      opportunity.createdAt = opportunity.createdAt ? new Date(opportunity.createdAt) : undefined;
+      opportunity.updatedAt = opportunity.updatedAt ? new Date(opportunity.updatedAt) : opportunity.createdAt;
+      opportunity.applicationDeadline = opportunity.applicationDeadline ? new Date(opportunity.applicationDeadline) : undefined;
+      opportunity.eventStartDate = opportunity.eventStartDate ? new Date(opportunity.eventStartDate) : undefined;
+      opportunity.eventEndDate = opportunity.eventEndDate ? new Date(opportunity.eventEndDate) : undefined;
     }
     return opportunity ? { ...opportunity } : undefined;
 }
+
+
+/**
+ * Updates an existing volunteer opportunity.
+ * @param opportunityId The ID of the opportunity to update.
+ * @param opportunityData The partial data to update the opportunity with.
+ * @returns The updated opportunity or null if not found.
+ */
+export async function updateOpportunity(
+  opportunityId: string,
+  opportunityData: Partial<Omit<Opportunity, 'id' | 'createdAt' | 'organizationId' | 'organization'>>
+): Promise<Opportunity | null> {
+  await sleep(300);
+  let opportunitiesData = await loadOpportunitiesData();
+  const opportunityIndex = opportunitiesData.findIndex(opp => opp.id === opportunityId);
+
+  if (opportunityIndex === -1) {
+    console.error(`Opportunity with ID ${opportunityId} not found for update.`);
+    return null;
+  }
+
+  const updatedOpportunity: Opportunity = {
+    ...opportunitiesData[opportunityIndex],
+    ...opportunityData,
+    updatedAt: new Date(), // Set/update the updatedAt timestamp
+     // Ensure date fields are correctly formatted as Date objects if provided
+    applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : opportunitiesData[opportunityIndex].applicationDeadline,
+    eventStartDate: opportunityData.eventStartDate ? new Date(opportunityData.eventStartDate) : opportunitiesData[opportunityIndex].eventStartDate,
+    eventEndDate: opportunityData.eventEndDate ? new Date(opportunityData.eventEndDate) : opportunitiesData[opportunityIndex].eventEndDate,
+  };
+  
+  opportunitiesData[opportunityIndex] = updatedOpportunity;
+  await writeData(OPPORTUNITIES_FILE, opportunitiesData);
+  console.log('Opportunity updated and saved:', updatedOpportunity);
+  return { ...updatedOpportunity };
+}
+
+/**
+ * Deletes a volunteer opportunity.
+ * Also notifies volunteers who applied to this opportunity.
+ * @param opportunityId The ID of the opportunity to delete.
+ * @param organizationId The ID of the organization deleting (for verification).
+ * @returns Object indicating success and number of volunteers notified.
+ */
+export async function deleteOpportunity(
+  opportunityId: string,
+  organizationId: string
+): Promise<{ success: boolean; message: string; notifiedCount: number }> {
+  await sleep(300);
+  let opportunitiesData = await loadOpportunitiesData();
+  const applicationsData = await loadApplicationsData();
+
+  const opportunityIndex = opportunitiesData.findIndex(opp => opp.id === opportunityId);
+  const opportunityToDelete = opportunitiesData[opportunityIndex];
+
+  if (opportunityIndex === -1 || !opportunityToDelete) {
+    return { success: false, message: 'Opportunity not found.', notifiedCount: 0 };
+  }
+
+  if (opportunityToDelete.organizationId !== organizationId) {
+    return { success: false, message: 'Unauthorized to delete this opportunity.', notifiedCount: 0 };
+  }
+
+  // Remove the opportunity
+  opportunitiesData.splice(opportunityIndex, 1);
+  await writeData(OPPORTUNITIES_FILE, opportunitiesData);
+
+  // Find and notify applicants
+  const relevantApplications = applicationsData.filter(app => app.opportunityId === opportunityId);
+  let notifiedCount = 0;
+  for (const app of relevantApplications) {
+    try {
+      await createNotification(
+        app.volunteerId,
+        `The opportunity "${opportunityToDelete.title}" you applied for has been cancelled by the organization.`,
+        '/dashboard/volunteer' // Link to their dashboard
+      );
+      notifiedCount++;
+    } catch (error) {
+      console.error(`Failed to notify volunteer ${app.volunteerId} for deleted opportunity ${opportunityId}:`, error);
+    }
+  }
+
+  // Optional: Update application statuses to 'withdrawn' or similar, or delete them.
+  // For now, we just notify. If deleting applications:
+  // const remainingApplications = applicationsData.filter(app => app.opportunityId !== opportunityId);
+  // await writeData(APPLICATIONS_FILE, remainingApplications);
+
+  console.log(`Opportunity ${opportunityId} deleted. Notified ${notifiedCount} volunteers.`);
+  return { success: true, message: 'Opportunity deleted successfully.', notifiedCount };
+}
+
 
 /**
  * Updates an existing application with performance feedback from the organization.

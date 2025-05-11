@@ -1,13 +1,13 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, CalendarDays } from "lucide-react"; // Added CalendarDays
+import { Calendar as CalendarIcon, CalendarDays } from "lucide-react"; 
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,11 +25,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, Trash2 } from 'lucide-react'; // Added Trash2 for removing image
 import { useAuth } from '@/context/AuthContext';
-import { createOpportunityAction } from '@/actions/job-board-actions';
-import { opportunityCategories } from '@/config/constants'; // Import categories
+import { createOpportunityAction, updateOpportunityAction } from '@/actions/job-board-actions';
+import { opportunityCategories } from '@/config/constants'; 
 import { cn } from '@/lib/utils';
+import type { Opportunity } from '@/services/job-board'; // Import Opportunity type
 
 // Helper function to convert File to Base64 Data URI
 const fileToDataUri = (file: File): Promise<string> => {
@@ -77,20 +78,42 @@ const formSchema = z.object({
   return true;
 }, {
   message: "Event end date must be after or on the start date.",
-  path: ["eventEndDate"], // Point error to end date field
+  path: ["eventEndDate"], 
 });
 
 type OpportunityFormValues = z.infer<typeof formSchema>;
 
-export function OpportunityCreationForm() {
+interface OpportunityCreationFormProps {
+  mode?: 'create' | 'edit';
+  initialData?: Opportunity | null; // Null if not found or error
+  opportunityId?: string; // Required for edit mode
+}
+
+export function OpportunityCreationForm({
+  mode = 'create',
+  initialData,
+  opportunityId,
+}: OpportunityCreationFormProps) {
   const { toast } = useToast();
   const { user, role } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null | undefined>(initialData?.imageUrl);
 
   const form = useForm<OpportunityFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
+    defaultValues: mode === 'edit' && initialData ? {
+      title: initialData.title || '',
+      description: initialData.description || '',
+      location: initialData.location || '',
+      commitment: initialData.commitment || '',
+      category: initialData.category || '',
+      pointsAwarded: initialData.pointsAwarded ?? 0,
+      applicationDeadline: initialData.applicationDeadline ? new Date(initialData.applicationDeadline) : undefined,
+      eventStartDate: initialData.eventStartDate ? new Date(initialData.eventStartDate) : undefined,
+      eventEndDate: initialData.eventEndDate ? new Date(initialData.eventEndDate) : undefined,
+      image: undefined, // Image is handled separately via currentImageUrl and new file upload
+    } : {
       title: '',
       description: '',
       location: '',
@@ -104,68 +127,106 @@ export function OpportunityCreationForm() {
     },
   });
 
+  useEffect(() => {
+    if (mode === 'edit' && initialData) {
+      form.reset({
+        title: initialData.title || '',
+        description: initialData.description || '',
+        location: initialData.location || '',
+        commitment: initialData.commitment || '',
+        category: initialData.category || '',
+        pointsAwarded: initialData.pointsAwarded ?? 0,
+        applicationDeadline: initialData.applicationDeadline ? new Date(initialData.applicationDeadline) : undefined,
+        eventStartDate: initialData.eventStartDate ? new Date(initialData.eventStartDate) : undefined,
+        eventEndDate: initialData.eventEndDate ? new Date(initialData.eventEndDate) : undefined,
+      });
+      setCurrentImageUrl(initialData.imageUrl);
+    }
+  }, [mode, initialData, form]);
+
+
   async function onSubmit(values: OpportunityFormValues) {
     if (!user || role !== 'organization') {
-      toast({ title: 'Unauthorized', description: 'Only organizations can create opportunities.', variant: 'destructive' });
+      toast({ title: 'Unauthorized', description: 'Only organizations can manage opportunities.', variant: 'destructive' });
       return;
     }
     setIsSubmitting(true);
 
-    let imageUrlDataUri = '';
+    let finalImageUrl = currentImageUrl; // Use existing image by default
     const imageFile = values.image?.[0];
 
-    if (imageFile) {
+    if (imageFile) { // If a new image is uploaded
       try {
-        imageUrlDataUri = await fileToDataUri(imageFile);
+        finalImageUrl = await fileToDataUri(imageFile);
       } catch (error) {
         console.error('Error converting image file to Data URI:', error);
-        toast({
-          title: 'Image Processing Error',
-          description: 'Could not process the image file. Please try again.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Image Error', description: 'Could not process new image.', variant: 'destructive' });
         setIsSubmitting(false);
         return;
       }
+    } else if (currentImageUrl === null) { // If current image was explicitly removed
+        finalImageUrl = undefined;
     }
 
 
+    const opportunityPayload = {
+      ...values,
+      imageUrl: finalImageUrl, // Use the determined image URL
+      pointsAwarded: values.pointsAwarded ?? 0,
+      // Dates are already Date objects from the form
+    };
+    // Remove the 'image' FileList from the payload to be sent to the action
+    const { image, ...payloadForAction } = opportunityPayload;
+
+
     try {
-      const { image, ...restOfValues } = values;
-      const result = await createOpportunityAction(
-        {
-          ...restOfValues,
-          organization: user.displayName,
-          organizationId: user.id,
-          pointsAwarded: values.pointsAwarded ?? 0,
-          imageUrl: imageUrlDataUri || undefined,
-          applicationDeadline: values.applicationDeadline,
-          eventStartDate: values.eventStartDate,
-          eventEndDate: values.eventEndDate,
-        },
-        user.id,
-        user.displayName
-      );
+      let result;
+      if (mode === 'create') {
+        result = await createOpportunityAction(
+          payloadForAction,
+          user.id,
+          user.displayName
+        );
+      } else if (mode === 'edit' && opportunityId) {
+        result = await updateOpportunityAction(
+          opportunityId,
+          payloadForAction,
+          user.id // Pass org ID for verification
+        );
+      } else {
+        throw new Error("Invalid form mode or missing opportunity ID.");
+      }
 
       if (result.success && result.opportunity) {
-        toast({ title: 'Success', description: `Opportunity "${result.opportunity.title}" created.` });
+        toast({ title: 'Success', description: `Opportunity "${result.opportunity.title}" ${mode === 'create' ? 'created' : 'updated'}.` });
         form.reset();
         router.push('/dashboard/organization');
-        router.refresh();
+        router.refresh(); // To reflect changes on the dashboard
       } else {
-        throw new Error(result.message || 'Failed to create opportunity.');
+        throw new Error(result.message || `Failed to ${mode} opportunity.`);
       }
     } catch (error: any) {
-      console.error('Opportunity creation failed:', error);
-      toast({ title: 'Error', description: error.message || 'Could not create opportunity.', variant: 'destructive' });
+      console.error(`Opportunity ${mode} failed:`, error);
+      toast({ title: 'Error', description: error.message || `Could not ${mode} opportunity.`, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
   }
+  
+  const handleRemoveCurrentImage = () => {
+    setCurrentImageUrl(null); // Mark for removal or no image
+    form.setValue('image', undefined, { shouldValidate: true }); // Clear any selected file
+  };
+
 
   if (!user || role !== 'organization') {
-     return <p className="text-destructive text-center">You must be logged in as an organization to post opportunities.</p>;
+     return <p className="text-destructive text-center">You must be logged in as an organization to manage opportunities.</p>;
   }
+  
+  if (mode === 'edit' && !initialData && !form.formState.isLoading) {
+    return <p className="text-destructive text-center">Opportunity data could not be loaded for editing.</p>;
+  }
+
 
   return (
     <Form {...form}>
@@ -237,7 +298,7 @@ export function OpportunityCreationForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Area of Interest</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder="Select a category" />
@@ -288,7 +349,7 @@ export function OpportunityCreationForm() {
                      selected={field.value}
                      onSelect={field.onChange}
                      disabled={(date) =>
-                       date < new Date(new Date().setDate(new Date().getDate() -1)) // Disable past dates
+                       mode === 'create' ? date < new Date(new Date().setDate(new Date().getDate() -1)) : false // Disable past dates only for create mode
                      }
                      initialFocus
                    />
@@ -409,7 +470,19 @@ export function OpportunityCreationForm() {
            )}
          />
 
-         {/* Image Upload (Optional) */}
+        {/* Image Upload (Optional) */}
+        {mode === 'edit' && currentImageUrl && (
+          <div className="space-y-2">
+            <FormLabel>Current Image</FormLabel>
+            <div className="relative w-full h-48 rounded-md overflow-hidden border">
+              <Image src={currentImageUrl} alt="Current opportunity image" layout="fill" objectFit="cover" />
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={handleRemoveCurrentImage} className="text-xs text-destructive">
+              <Trash2 className="mr-1 h-3 w-3" /> Remove Current Image
+            </Button>
+            <FormDescription>To change the image, upload a new one below. Removing the current image without uploading a new one will clear it.</FormDescription>
+          </div>
+        )}
          <FormField
            control={form.control}
            name="image"
@@ -417,7 +490,7 @@ export function OpportunityCreationForm() {
              const currentFile = value?.[0];
              return (
                <FormItem>
-                 <FormLabel>Opportunity Image (Optional)</FormLabel>
+                 <FormLabel>{mode === 'edit' && currentImageUrl ? 'Upload New Image (Optional)' : 'Opportunity Image (Optional)'}</FormLabel>
                  <FormControl>
                    <div className="relative">
                       <Input
@@ -427,7 +500,7 @@ export function OpportunityCreationForm() {
                         {...form.register("image")}
                         className="block w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer bg-background"
                       />
-                      {currentFile && <span className="text-sm text-muted-foreground mt-1 block">{currentFile.name}</span>}
+                      {currentFile && <span className="text-sm text-muted-foreground mt-1 block">New: {currentFile.name}</span>}
                       <Upload className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
                    </div>
                  </FormControl>
@@ -444,14 +517,13 @@ export function OpportunityCreationForm() {
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating...
+              {mode === 'create' ? 'Creating...' : 'Updating...'}
             </>
           ) : (
-            'Create Opportunity'
+            mode === 'create' ? 'Create Opportunity' : 'Update Opportunity'
           )}
         </Button>
       </form>
     </Form>
   );
 }
-

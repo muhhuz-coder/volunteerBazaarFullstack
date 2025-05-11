@@ -1,4 +1,3 @@
-
 // src/app/dashboard/organization/page.tsx
 'use client';
 
@@ -10,16 +9,14 @@ import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download, Edit3 } from 'lucide-react'; // Added Edit3 for performance
-// Remove direct service imports
-import type { Opportunity, VolunteerApplication } from '@/services/job-board'; // Keep types
+import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download, Edit3, Trash2, Edit } from 'lucide-react'; 
+import type { Opportunity, VolunteerApplication } from '@/services/job-board'; 
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-// Import server actions
-import { getOpportunitiesAction, getApplicationsForOrganizationAction } from '@/actions/job-board-actions';
+import { getOpportunitiesAction, getApplicationsForOrganizationAction, deleteOpportunityAction } from '@/actions/job-board-actions';
 import { acceptVolunteerApplication, rejectVolunteerApplication } from '@/actions/application-actions';
-import { cn } from '@/lib/utils'; // Import cn
-import { AttendanceForm } from '@/components/dashboard/organization/attendance-form'; // Import AttendanceForm
+import { cn } from '@/lib/utils'; 
+import { AttendanceForm } from '@/components/dashboard/organization/attendance-form'; 
 import {
   Dialog,
   DialogContent,
@@ -28,6 +25,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 
 export default function OrganizationDashboard() {
@@ -37,29 +45,30 @@ export default function OrganizationDashboard() {
 
   const [applications, setApplications] = useState<VolunteerApplication[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-  const [loadingData, setLoadingData] = useState(true); // Combined loading state
+  const [loadingData, setLoadingData] = useState(true); 
   const [processingAppId, setProcessingAppId] = useState<string | null>(null);
   const [selectedAppForPerformance, setSelectedAppForPerformance] = useState<VolunteerApplication | null>(null);
+  const [deletingOppId, setDeletingOppId] = useState<string | null>(null);
 
 
   const fetchData = useCallback(async () => {
     if (user && role === 'organization') {
       setLoadingData(true);
       try {
-        // Fetch applications and opportunities in parallel
+        
         const [fetchedApps, allOpportunities] = await Promise.all([
           getApplicationsForOrganizationAction(user.id),
-          getOpportunitiesAction() // Fetch all and filter locally, or modify action if needed
+          getOpportunitiesAction(undefined, undefined, undefined, undefined, 'recent', 'all') // Fetch all for this org initially
         ]);
 
-        // Process applications
+        
         const processedApps = fetchedApps.map(app => ({
             ...app,
             submittedAt: typeof app.submittedAt === 'string' ? new Date(app.submittedAt) : app.submittedAt
         }));
         setApplications(processedApps);
 
-        // Filter opportunities for this organization
+        
         const orgOpportunities = allOpportunities.filter(opp => opp.organizationId === user.id);
         setOpportunities(orgOpportunities);
 
@@ -122,7 +131,7 @@ export default function OrganizationDashboard() {
       }
   };
 
-  // Function to handle opening the Data URI in a new tab
+  
   const handleViewAttachment = (dataUri: string) => {
      if (!dataUri.startsWith('data:')) {
         toast({ title: "Error", description: "Invalid attachment data.", variant: "destructive" });
@@ -133,7 +142,7 @@ export default function OrganizationDashboard() {
       win.document.write(
         `<iframe src="${dataUri}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
       );
-      win.document.title = "View Attachment"; // Set a title for the new tab
+      win.document.title = "View Attachment"; 
     } else {
       toast({ title: "Popup Blocked", description: "Please allow popups for this site to view attachments.", variant: "destructive" });
     }
@@ -141,11 +150,32 @@ export default function OrganizationDashboard() {
 
   const handlePerformanceFormSubmit = (updatedApplication: VolunteerApplication) => {
     setApplications(prevApps => prevApps.map(app => app.id === updatedApplication.id ? updatedApplication : app));
-    setSelectedAppForPerformance(null); // Close dialog
+    setSelectedAppForPerformance(null); 
+  };
+
+  const handleDeleteOpportunity = async (opportunityId: string) => {
+    if (!user) return;
+    setDeletingOppId(opportunityId);
+    try {
+      const result = await deleteOpportunityAction(opportunityId, user.id);
+      if (result.success) {
+        toast({ title: "Success", description: `Opportunity deleted. ${result.notifiedCount || 0} applicants notified.` });
+        setOpportunities(prev => prev.filter(opp => opp.id !== opportunityId));
+        // Optionally, refresh applications if they might be affected (e.g., status change)
+        // For now, just removing from opportunities list.
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
+    } catch (error: any) {
+      console.error('Error deleting opportunity:', error);
+      toast({ title: 'Error', description: 'Failed to delete opportunity.', variant: 'destructive' });
+    } finally {
+      setDeletingOppId(null);
+    }
   };
 
 
-  // Combined loading state
+  
   if (authLoading || (user && role === 'organization' && loadingData)) {
     return (
        <div className="flex flex-col min-h-screen bg-secondary">
@@ -158,8 +188,8 @@ export default function OrganizationDashboard() {
            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-lg" />)}
            </div>
-           <Skeleton className="h-64 w-full mt-6" />
-           <Skeleton className="h-64 w-full mt-6" />
+           <Skeleton className="h-64 w-full mt-6 rounded-lg" />
+           <Skeleton className="h-64 w-full mt-6 rounded-lg" />
          </div>
          <footer className="bg-primary p-4 mt-auto">
            <Skeleton className="h-4 w-1/3 mx-auto" />
@@ -193,8 +223,8 @@ export default function OrganizationDashboard() {
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
       <Header />
-      <div className="container mx-auto px-4 py-12 flex-grow"> {/* Adjusted padding */}
-        <div className="flex flex-wrap justify-between items-center gap-4 mb-8"> {/* Adjusted gap and margin */}
+      <div className="container mx-auto px-4 py-12 flex-grow"> 
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-8"> 
           <h1 className="text-3xl font-bold text-primary">Organization Dashboard</h1>
           <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
              <Link href="/dashboard/organization/create">
@@ -202,7 +232,7 @@ export default function OrganizationDashboard() {
              </Link>
           </Button>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8"> {/* Adjusted gap and margin */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8"> 
            <Card className={cn("border", "card-hover-effect")}>
              <CardHeader className="pb-2">
                <CardTitle className="text-lg flex items-center gap-2"><Briefcase className="h-5 w-5 text-accent" /> Active Opportunities</CardTitle>
@@ -227,7 +257,7 @@ export default function OrganizationDashboard() {
                  <CardDescription>Update your organization's information.</CardDescription>
               </CardHeader>
               <CardContent>
-                 <Button variant="outline" size="sm" disabled>Edit Profile</Button> {/* Placeholder */}
+                 <Button asChild variant="outline" size="sm"><Link href="/profile/edit">Edit Profile</Link></Button>
               </CardContent>
             </Card>
         </div>
@@ -242,12 +272,45 @@ export default function OrganizationDashboard() {
                 {opportunities.length > 0 ? (
                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                         {opportunities.map(opp => (
-                            <div key={opp.id} className="flex justify-between items-center p-3 bg-card/80 rounded-md border">
-                                <div>
-                                    <p className="font-medium">{opp.title}</p>
+                            <div key={opp.id} className="flex flex-wrap justify-between items-center p-3 bg-card/80 rounded-md border gap-2">
+                                <div className="flex-grow">
+                                    <p className="font-medium text-primary">{opp.title}</p>
                                     <p className="text-sm text-muted-foreground">{opp.location} - {opp.category}</p>
                                 </div>
-                                <Button variant="outline" size="sm" disabled>Manage</Button> {/* Placeholder */}
+                                <div className="flex gap-2 flex-shrink-0">
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href={`/dashboard/organization/edit/${opp.id}`}>
+                                            <Edit className="mr-1 h-3.5 w-3.5" /> Edit
+                                        </Link>
+                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="sm" disabled={deletingOppId === opp.id}>
+                                                {deletingOppId === opp.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1 h-3.5 w-3.5" />}
+                                                Delete
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete the opportunity
+                                                    "{opp.title}" and notify all applicants.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    onClick={() => handleDeleteOpportunity(opp.id)}
+                                                    className="bg-destructive hover:bg-destructive/90"
+                                                    disabled={deletingOppId === opp.id}
+                                                >
+                                                    {deletingOppId === opp.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Delete"}
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -391,7 +454,7 @@ export default function OrganizationDashboard() {
         </div>
 
 
-         <div className="mt-8 text-center"> {/* Adjusted margin */}
+         <div className="mt-8 text-center"> 
             <Button asChild variant="outline">
                <Link href="/dashboard/messages">
                  <MessageSquare className="mr-2 h-4 w-4" /> View All Messages
