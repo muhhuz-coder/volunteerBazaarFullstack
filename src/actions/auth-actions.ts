@@ -34,6 +34,7 @@ export async function signInUser(email: string, pass: string): Promise<{ success
 
     if (existingUser && userEmailKey) {
       // Simulate password check (in a real app, hash and compare)
+      // For mock, we assume password check is handled or not needed here.
       // if (await bcrypt.compare(pass, existingUser.passwordHash)) { // Example with bcrypt
       // }
 
@@ -55,7 +56,7 @@ export async function signInUser(email: string, pass: string): Promise<{ success
       console.log('Server Action: Sign in successful for:', email);
       return { success: true, message: 'Login successful!', user: userToReturn };
     } else {
-      console.log('Server Action: Sign in failed, user not found:', email);
+      console.log('Server Action: Sign in failed, user not found or password incorrect:', email);
       return { success: false, message: 'Invalid email or password.', user: null };
     }
   } catch (error: any) {
@@ -105,6 +106,10 @@ export async function signUpUser(email: string, pass: string, name: string, role
       stats: roleToSet === 'volunteer' ? { points: 0, badges: [], hours: 0 } : undefined,
       profilePictureUrl: undefined, // Initialize profile picture URL
       // passwordHash: passwordHash, // Store hash, not password
+      // Extended profile fields initialized
+      bio: '',
+      skills: [],
+      causes: [],
     };
 
     // Add new user to map (using original email casing as key) and save
@@ -290,4 +295,85 @@ export async function updateUserProfilePictureAction(userId: string, imageDataUr
     console.error("Server Action: Profile picture update error -", error);
     return { success: false, message: 'Server error during profile picture update.', user: null };
   }
+}
+
+/**
+ * Server action to update a user's bio, skills, and causes.
+ */
+export async function updateUserProfileBioSkillsCauses(
+  userId: string,
+  profileData: Partial<Pick<UserProfile, 'displayName' | 'bio' | 'skills' | 'causes'>>
+): Promise<{ success: boolean; message: string; user?: UserProfile | null }> {
+  console.log(`Server Action: Updating profile (bio/skills/causes) for user ID: ${userId}`, profileData);
+
+  try {
+    const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+    const usersData = objectToMap(usersObject);
+
+    let userEmailKey: string | undefined;
+    let userToUpdate: UserProfile | undefined;
+
+    // Find user by ID
+    for (const [emailKey, profile] of usersData.entries()) {
+      if (profile.id === userId) {
+        userEmailKey = emailKey;
+        userToUpdate = profile;
+        break;
+      }
+    }
+
+    if (!userToUpdate || !userEmailKey) {
+      console.log('Server Action: Update profile (bio/skills/causes) failed, user not found:', userId);
+      return { success: false, message: 'User not found.', user: null };
+    }
+
+    // Update specified fields
+    if (profileData.displayName !== undefined) userToUpdate.displayName = profileData.displayName;
+    if (profileData.bio !== undefined) userToUpdate.bio = profileData.bio;
+    if (profileData.skills !== undefined) userToUpdate.skills = profileData.skills;
+    if (profileData.causes !== undefined) userToUpdate.causes = profileData.causes;
+
+    // Update map and save
+    const updatedUsersMap = usersData.set(userEmailKey, userToUpdate);
+    await writeData(USERS_FILE, mapToObject(updatedUsersMap));
+
+    console.log('Server Action: Profile (bio/skills/causes) update successful for:', userId);
+    const { ...userToReturn } = userToUpdate;
+    return { success: true, message: 'Profile updated successfully.', user: userToReturn };
+
+  } catch (error: any) {
+    console.error("Server Action: Profile (bio/skills/causes) update error -", error);
+    return { success: false, message: 'Server error during profile update.', user: null };
+  }
+}
+
+/**
+ * Placeholder server action for sending a password reset email.
+ * In a real app, this would integrate with an email service and token generation.
+ */
+export async function sendPasswordResetEmailAction(email: string): Promise<{ success: boolean; message: string }> {
+  console.log(`Server Action: Password reset requested for email: ${email}`);
+  // Simulate checking if email exists
+  const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+  const usersData = objectToMap(usersObject);
+  
+  let emailExists = false;
+  for (const storedEmail of usersData.keys()) {
+    if (storedEmail.toLowerCase() === email.toLowerCase()) {
+      emailExists = true;
+      break;
+    }
+  }
+
+  if (!emailExists) {
+    // Note: For security, you might not want to reveal if an email is registered.
+    // However, for this mock, we'll indicate it.
+    return { success: false, message: "If this email is registered, a reset link will be sent (mock)." };
+  }
+
+  // Simulate sending an email
+  // In a real app: generate a token, store it, send email with a link containing the token.
+  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+
+  return { success: true, message: "If your email is registered, a password reset link has been sent (mock)." };
 }
