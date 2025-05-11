@@ -8,7 +8,7 @@ import Image from 'next/image';
 import type { Opportunity } from '@/services/job-board';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, Briefcase, LayoutGrid, List, Users, Handshake, Star, Eye, CalendarClock } from 'lucide-react';
+import { MapPin, Clock, Activity, ArrowRight, MessageSquare, Loader2, Briefcase, LayoutGrid, List, Users, Handshake, Star, Eye, CalendarClock, CalendarDays } from 'lucide-react'; // Added CalendarDays
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -192,6 +192,16 @@ export function OpportunityList({
                 <span>Apply by: {format(new Date(opportunity.applicationDeadline), 'MMM d, yyyy')}</span>
             </div>
           )}
+          {(opportunity.eventStartDate || opportunity.eventEndDate) && (
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+                <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="line-clamp-1">
+                    Event: {opportunity.eventStartDate ? format(new Date(opportunity.eventStartDate), 'PPP') : ''}
+                    {opportunity.eventEndDate ? ` - ${format(new Date(opportunity.eventEndDate), 'PPP')}` : ''}
+                    {!opportunity.eventStartDate && !opportunity.eventEndDate && 'Dates TBD'}
+                </span>
+            </div>
+           )}
           <p className="text-foreground/90 line-clamp-2 pt-2 text-xs leading-relaxed">{opportunity.description}</p>
         </CardContent>
 
@@ -237,6 +247,17 @@ export function OpportunityList({
                     <CalendarClock className="h-4 w-4" /> {format(new Date(opportunity.applicationDeadline), 'PPP')}
                 </p>
              </div>
+           )}
+           {(opportunity.eventStartDate || opportunity.eventEndDate) && (
+            <div className="text-xs">
+                <p className="font-medium text-muted-foreground">Event Dates</p>
+                <p className="text-sm font-semibold text-primary flex items-center gap-1">
+                    <CalendarDays className="h-4 w-4" />
+                     {opportunity.eventStartDate ? format(new Date(opportunity.eventStartDate), 'MMM d') : 'TBD'}
+                     {opportunity.eventEndDate && opportunity.eventStartDate ? ' - ' : ''}
+                     {opportunity.eventEndDate ? format(new Date(opportunity.eventEndDate), 'MMM d, yyyy') : (opportunity.eventStartDate ? `, ${new Date(opportunity.eventStartDate).getFullYear()}` : '')}
+                </p>
+            </div>
            )}
           <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
              {[...Array(5)].map((_,i) => <Star key={i} className={cn("h-3.5 w-3.5", i < Math.round((opportunity.pointsAwarded || 0) / 20) ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground/30")} />)}
@@ -356,3 +377,4 @@ export function OpportunityList({
     </>
   );
 }
+

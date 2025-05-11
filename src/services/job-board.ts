@@ -19,6 +19,8 @@ export interface Opportunity {
   imageUrl?: string; // Optional image for the opportunity (Data URI or URL)
   createdAt?: Date | string; // Optional: Timestamp for when opportunity was created for sorting
   applicationDeadline?: Date | string; // Optional: Deadline for applications
+  eventStartDate?: Date | string; // New: Start date of the event/activity
+  eventEndDate?: Date | string; // New: End date of the event/activity
 }
 
 /**
@@ -56,6 +58,8 @@ async function loadOpportunitiesData(): Promise<Opportunity[]> {
         ...opp,
         createdAt: opp.createdAt ? new Date(opp.createdAt) : new Date(0), // Default to epoch if not present
         applicationDeadline: opp.applicationDeadline ? new Date(opp.applicationDeadline) : undefined,
+        eventStartDate: opp.eventStartDate ? new Date(opp.eventStartDate) : undefined,
+        eventEndDate: opp.eventEndDate ? new Date(opp.eventEndDate) : undefined,
     }));
 }
 
@@ -304,6 +308,8 @@ export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>
       imageUrl: opportunityData.imageUrl || undefined,
       createdAt: new Date(), // Add createdAt timestamp
       applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : undefined,
+      eventStartDate: opportunityData.eventStartDate ? new Date(opportunityData.eventStartDate) : undefined,
+      eventEndDate: opportunityData.eventEndDate ? new Date(opportunityData.eventEndDate) : undefined,
     };
 
     opportunitiesData.push(newOpportunity);
@@ -327,6 +333,12 @@ export async function getOpportunityById(id: string): Promise<Opportunity | unde
       }
       if (opportunity.applicationDeadline) {
         opportunity.applicationDeadline = opportunity.applicationDeadline instanceof Date ? opportunity.applicationDeadline : new Date(opportunity.applicationDeadline);
+      }
+      if (opportunity.eventStartDate) {
+        opportunity.eventStartDate = opportunity.eventStartDate instanceof Date ? opportunity.eventStartDate : new Date(opportunity.eventStartDate);
+      }
+      if (opportunity.eventEndDate) {
+        opportunity.eventEndDate = opportunity.eventEndDate instanceof Date ? opportunity.eventEndDate : new Date(opportunity.eventEndDate);
       }
     }
     return opportunity ? { ...opportunity } : undefined;
@@ -367,3 +379,4 @@ export async function recordVolunteerPerformance(
   console.log('Volunteer performance recorded and saved:', applicationsData[appIndex]);
   return { ...applicationsData[appIndex] };
 }
+

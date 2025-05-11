@@ -7,7 +7,7 @@ import * as z from 'zod';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarDays } from "lucide-react"; // Added CalendarDays
 
 import { Button } from '@/components/ui/button';
 import {
@@ -54,6 +54,8 @@ const formSchema = z.object({
   }),
   pointsAwarded: z.coerce.number().min(0, 'Points must be 0 or greater.').optional(),
   applicationDeadline: z.date().optional(),
+  eventStartDate: z.date().optional(),
+  eventEndDate: z.date().optional(),
   image: z
     .custom<FileList>()
     .optional()
@@ -68,6 +70,14 @@ const formSchema = z.object({
         ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(fileList[0].type),
       "Only JPG, PNG, WEBP, GIF formats are supported."
     ),
+}).refine(data => {
+  if (data.eventStartDate && data.eventEndDate) {
+    return data.eventEndDate >= data.eventStartDate;
+  }
+  return true;
+}, {
+  message: "Event end date must be after or on the start date.",
+  path: ["eventEndDate"], // Point error to end date field
 });
 
 type OpportunityFormValues = z.infer<typeof formSchema>;
@@ -88,6 +98,8 @@ export function OpportunityCreationForm() {
       category: '',
       pointsAwarded: 0,
       applicationDeadline: undefined,
+      eventStartDate: undefined,
+      eventEndDate: undefined,
       image: undefined,
     },
   });
@@ -127,7 +139,9 @@ export function OpportunityCreationForm() {
           organizationId: user.id,
           pointsAwarded: values.pointsAwarded ?? 0,
           imageUrl: imageUrlDataUri || undefined,
-          applicationDeadline: values.applicationDeadline, // Pass the date object
+          applicationDeadline: values.applicationDeadline,
+          eventStartDate: values.eventStartDate,
+          eventEndDate: values.eventEndDate,
         },
         user.id,
         user.displayName
@@ -288,6 +302,97 @@ export function OpportunityCreationForm() {
            )}
          />
 
+        {/* Event Start Date (Optional) */}
+        <FormField
+          control={form.control}
+          name="eventStartDate"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Event Start Date (Optional)</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full pl-3 text-left font-normal bg-background",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      {field.value ? (
+                        format(field.value, "PPP")
+                      ) : (
+                        <span>Pick a start date</span>
+                      )}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={field.value}
+                    onSelect={field.onChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormDescription>
+                When the event or activity starts.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Event End Date (Optional) */}
+        <FormField
+          control={form.control}
+          name="eventEndDate"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Event End Date (Optional)</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full pl-3 text-left font-normal bg-background",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      {field.value ? (
+                        format(field.value, "PPP")
+                      ) : (
+                        <span>Pick an end date</span>
+                      )}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={field.value}
+                    onSelect={field.onChange}
+                    disabled={(date) =>
+                      form.getValues("eventStartDate")
+                        ? date < form.getValues("eventStartDate")!
+                        : false
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormDescription>
+                When the event or activity ends.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
          {/* Points Awarded (Optional) */}
          <FormField
            control={form.control}
@@ -349,3 +454,4 @@ export function OpportunityCreationForm() {
     </Form>
   );
 }
+

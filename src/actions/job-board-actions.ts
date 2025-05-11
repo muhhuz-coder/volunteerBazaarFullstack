@@ -98,6 +98,8 @@ export async function createOpportunityAction(
             organizationId: organizationId, // Add organizationId
             organization: organizationName, // Add organizationName
             applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : undefined,
+            eventStartDate: opportunityData.eventStartDate ? new Date(opportunityData.eventStartDate) : undefined,
+            eventEndDate: opportunityData.eventEndDate ? new Date(opportunityData.eventEndDate) : undefined,
         });
         return { success: true, message: 'Opportunity created successfully.', opportunity: newOpportunity };
     } catch (error: any) {
@@ -105,3 +107,4 @@ export async function createOpportunityAction(
         return { success: false, message: error.message || 'Failed to create opportunity.', opportunity: null };
     }
 }
+

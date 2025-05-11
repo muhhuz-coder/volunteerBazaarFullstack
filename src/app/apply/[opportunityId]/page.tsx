@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { notFound } from 'next/navigation';
 import MapDisplay from '@/components/map-display'; // Import the MapDisplay component
 import { Separator } from '@/components/ui/separator'; // Import Separator
-import { MapPin, Clock, Activity, CalendarClock } from 'lucide-react'; // Import icons
+import { MapPin, Clock, Activity, CalendarClock, CalendarDays } from 'lucide-react'; // Import icons, added CalendarDays
 import { format } from 'date-fns';
 
 export default async function ApplyPage({ params }: { params: { opportunityId: string } }) {
@@ -47,6 +47,15 @@ export default async function ApplyPage({ params }: { params: { opportunityId: s
                     <span>Apply by: {format(new Date(opportunity.applicationDeadline), 'PPP')}</span>
                   </div>
                 )}
+                 {(opportunity.eventStartDate || opportunity.eventEndDate) && (
+                    <div className="flex items-center gap-1.5">
+                        <CalendarDays className="h-4 w-4" />
+                        <span>
+                        Event Dates: {opportunity.eventStartDate ? format(new Date(opportunity.eventStartDate), 'PPP') : 'Not specified'}
+                        {opportunity.eventEndDate ? ` - ${format(new Date(opportunity.eventEndDate), 'PPP')}` : ''}
+                        </span>
+                    </div>
+                 )}
               </div>
           </CardHeader>
 
@@ -72,3 +81,4 @@ export default async function ApplyPage({ params }: { params: { opportunityId: s
     </div>
   );
 }
+
