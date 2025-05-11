@@ -1,4 +1,3 @@
-
 // src/app/onboarding/page.tsx
 'use client';
 
@@ -8,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Header } from '@/components/layout/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Sparkles, ShieldQuestion, CheckCircle } from 'lucide-react';
+import { Loader2, Sparkles, ShieldQuestion, CheckCircle, Building } from 'lucide-react'; // Added Building icon
 import { useToast } from '@/hooks/use-toast';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
@@ -26,9 +25,9 @@ const onboardingSchema = z.object({
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
 const steps = [
-  { id: 'welcome', title: 'Welcome!', icon: Sparkles },
-  { id: 'details', title: 'Your Interests & Skills', icon: ShieldQuestion },
-  { id: 'complete', title: 'All Set!', icon: CheckCircle },
+  { id: 'welcome', title: 'Welcome!', volunteerIcon: Sparkles, organizationIcon: Building },
+  { id: 'details', title: 'Tell Us More', volunteerIcon: ShieldQuestion, organizationIcon: ShieldQuestion }, // Generic title
+  { id: 'complete', title: 'All Set!', volunteerIcon: CheckCircle, organizationIcon: CheckCircle },
 ];
 
 export default function OnboardingPage() {
@@ -51,7 +50,6 @@ export default function OnboardingPage() {
       if (!user) {
         router.push('/login');
       } else if (user.onboardingCompleted) {
-        // If onboarding is already completed, redirect to dashboard
         const targetDashboard = user.role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer';
         router.push(targetDashboard);
       }
@@ -74,14 +72,14 @@ export default function OnboardingPage() {
       const result = await updateUserProfile({
         skills: skillsArray,
         causes: causesArray,
-        onboardingCompleted: true, // Mark onboarding as complete
+        onboardingCompleted: true,
       });
 
       if (result.success) {
-        toast({ title: "Preferences Saved!", description: "Your profile is updated." });
-        handleNextStep(); // Move to completion step
+        toast({ title: "Information Saved!", description: "Your profile is updated." });
+        handleNextStep(); 
       } else {
-        toast({ title: "Error", description: result.message || "Could not save preferences.", variant: "destructive" });
+        toast({ title: "Error", description: result.message || "Could not save information.", variant: "destructive" });
       }
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
@@ -97,7 +95,7 @@ export default function OnboardingPage() {
   
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
 
-  if (authLoading || !user || user.onboardingCompleted) {
+  if (authLoading || !user || user.onboardingCompleted === true) { // Check specifically for true
     return (
       <div className="flex items-center justify-center min-h-screen bg-secondary">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -105,7 +103,8 @@ export default function OnboardingPage() {
     );
   }
   
-  const CurrentIcon = steps[currentStep].icon;
+  const CurrentIcon = user.role === 'organization' ? steps[currentStep].organizationIcon : steps[currentStep].volunteerIcon;
+  const currentStepDetails = steps[currentStep];
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-secondary via-background to-secondary/70">
@@ -115,17 +114,16 @@ export default function OnboardingPage() {
           <CardHeader className="bg-primary/5 text-center py-8 border-b border-primary/10">
              <CurrentIcon className="mx-auto h-16 w-16 text-primary mb-4" />
             <CardTitle className="text-3xl font-bold text-primary">
-              {steps[currentStep].title}
+              {currentStepDetails.title}
             </CardTitle>
             <CardDescription className="text-md text-muted-foreground mt-1">
-              {currentStep === 0 && `Hi ${user.displayName}! Let's get you set up.`}
-              {currentStep === 1 && "Tell us what you're passionate about."}
+              {currentStep === 0 && `Hi ${user.displayName}! Let's get your ${user.role === 'organization' ? 'organization' : 'profile'} set up.`}
+              {currentStep === 1 && (user.role === 'organization' ? "Provide some details about your organization's focus." : "Tell us what you're passionate about.")}
               {currentStep === 2 && "You're all set to make a difference!"}
             </CardDescription>
           </CardHeader>
           
           <Progress value={progressPercentage} className="w-full h-1.5 rounded-none bg-primary/10" indicatorClassName="bg-gradient-to-r from-accent to-primary" />
-
 
           <CardContent className="p-6 md:p-8 space-y-8 min-h-[250px] flex flex-col justify-center">
             {currentStep === 0 && (
@@ -142,7 +140,7 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {currentStep === 1 && (
+            {currentStep === 1 && user.role === 'volunteer' && (
               <form onSubmit={handleSubmit(onSubmitPreferences)} className="space-y-6">
                 <div className="grid gap-1.5">
                   <Label htmlFor="skills" className="flex items-center gap-1.5 text-foreground"><Sparkles className="h-4 w-4 text-muted-foreground" /> Your Skills</Label>
@@ -173,13 +171,45 @@ export default function OnboardingPage() {
               </form>
             )}
 
+            {currentStep === 1 && user.role === 'organization' && (
+              <form onSubmit={handleSubmit(onSubmitPreferences)} className="space-y-6">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="skills" className="flex items-center gap-1.5 text-foreground"><Sparkles className="h-4 w-4 text-muted-foreground" /> Volunteer Skills We Need</Label>
+                  <Controller
+                    name="skills"
+                    control={control}
+                    render={({ field }) => <Textarea id="skills" placeholder="e.g., Mentoring, Event Support, Grant Writing" {...field} className="resize-none bg-background border-border focus:border-primary focus:ring-primary/30" rows={3} />}
+                  />
+                  <p className="text-xs text-muted-foreground">Skills your organization looks for in volunteers (comma-separated). Type 'None' if general.</p>
+                  {errors.skills && <p className="text-sm text-destructive">{errors.skills.message}</p>}
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="causes" className="flex items-center gap-1.5 text-foreground"><ShieldQuestion className="h-4 w-4 text-muted-foreground" /> Our Main Causes/Focus Areas</Label>
+                  <Controller
+                    name="causes"
+                    control={control}
+                    render={({ field }) => <Textarea id="causes" placeholder="e.g., Youth Development, Environmental Conservation, Community Health" {...field} className="resize-none bg-background border-border focus:border-primary focus:ring-primary/30" rows={3} />}
+                  />
+                   <p className="text-xs text-muted-foreground">Primary causes your organization serves (comma-separated). Type 'None' if broad.</p>
+                  {errors.causes && <p className="text-sm text-destructive">{errors.causes.message}</p>}
+                </div>
+                
+                <Button type="submit" disabled={isSubmitting} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base font-semibold shadow-md transition-transform hover:scale-105">
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                  Save & Continue
+                </Button>
+              </form>
+            )}
+
+
             {currentStep === 2 && (
               <div className="text-center space-y-6">
                 <p className="text-xl font-semibold text-primary">
                   Thank you, {user.displayName}!
                 </p>
                 <p className="text-muted-foreground">
-                  Your profile is now complete. You can start exploring opportunities and making an impact.
+                  Your {user.role === 'organization' ? 'organization profile' : 'profile'} is now complete. You can start exploring and making an impact.
                 </p>
                 <Button onClick={handleFinishOnboarding} size="lg" className="mt-6 bg-accent hover:bg-accent/90 text-accent-foreground shadow-md transition-transform hover:scale-105">
                   Go to Dashboard <CheckCircle className="ml-2 h-5 w-5" />
@@ -197,4 +227,3 @@ export default function OnboardingPage() {
        </footer>
     </div>
   );
-}
