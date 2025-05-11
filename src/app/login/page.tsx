@@ -11,8 +11,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LogIn, KeyRound, Mail } from 'lucide-react'; // Added KeyRound and Mail icons
-import { Separator } from '@/components/ui/separator'; // Added Separator
+import { Loader2, LogIn, KeyRound, Mail } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -20,11 +20,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { signInWithEmail } = useAuth(); // Use signInWithEmail for local auth
+  const { signIn } = useAuth(); // Use signIn for local auth
   const { toast } = useToast();
-
-  // REMOVED: Google Sign-In related state and handlers
-  // const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +29,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const result = await signInWithEmail(email, password);
+      const result = await signIn(email, password); // Use signIn instead of signInWithEmail
 
       if (result.success) {
         toast({
@@ -40,10 +37,6 @@ export default function LoginPage() {
           description: 'Welcome back!',
         });
         // Role-based redirection is handled by onAuthStateChanged listener in AuthContext
-        // It will push to '/select-role' if role is not set, or dashboard if set.
-        // If onAuthStateChanged doesn't redirect quickly enough, a default push can be added here,
-        // but it's better to let the context handle it for consistency.
-        // Example: router.push(result.role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer');
       } else {
         setError(result.message || 'Login failed.');
         toast({
@@ -65,7 +58,13 @@ export default function LoginPage() {
     }
   };
 
-  // REMOVED: handleGoogleSignIn function
+  const handleGoogleSignIn = () => {
+    // Placeholder for Google Sign-In logic
+    toast({
+      title: 'Coming Soon!',
+      description: 'Google Sign-In will be available in a future update.',
+    });
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary via-background to-secondary p-4">
@@ -90,7 +89,12 @@ export default function LoginPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password" className="flex items-center gap-2 text-sm"><KeyRound className="h-4 w-4 text-muted-foreground" />Password</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password" className="flex items-center gap-2 text-sm"><KeyRound className="h-4 w-4 text-muted-foreground" />Password</Label>
+                <Link href="/forgot-password" passHref>
+                  <Button variant="link" size="sm" className="text-xs h-auto p-0 text-primary hover:underline">Forgot password?</Button>
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -117,28 +121,17 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-          
-          {/* REMOVED: Google Sign-In Button and Separator Logic
+
           <Separator className="my-6" />
-          <Button 
-            variant="outline" 
-            className="w-full py-3 text-base font-semibold border-border hover:bg-muted/50 transition-all duration-300 ease-in-out hover:shadow-lg" 
-            onClick={handleGoogleSignIn} 
-            disabled={googleLoading || loading}
+          <Button
+            variant="outline"
+            className="w-full py-3 text-base font-semibold border-border hover:bg-muted/50 transition-all duration-300 ease-in-out hover:shadow-lg"
+            onClick={handleGoogleSignIn}
+            disabled // Keep disabled as functionality is commented out
           >
-            {googleLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.5 512 0 401.5 0 265.5S110.5 19 244 19c70.5 0 132.5 29.5 177.5 78.5l-67.5 62.5C320.5 134.5 286 112 244 112c-83.5 0-151.5 67.5-151.5 153.5S160.5 419 244 419c52.5 0 96.5-20.5 126-50.5 27-27 43.5-62.5 48.5-107.5H244V261.8h244z"></path></svg>
-                Sign in with Google
-              </>
-            )}
-          </Button> 
-          */}
+            <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.5 512 0 401.5 0 265.5S110.5 19 244 19c70.5 0 132.5 29.5 177.5 78.5l-67.5 62.5C320.5 134.5 286 112 244 112c-83.5 0-151.5 67.5-151.5 153.5S160.5 419 244 419c52.5 0 96.5-20.5 126-50.5 27-27 43.5-62.5 48.5-107.5H244V261.8h244z"></path></svg>
+            Sign in with Google
+          </Button>
 
         </CardContent>
         <CardFooter className="flex flex-col gap-4 text-center text-sm pb-8 bg-primary/5 pt-4">
