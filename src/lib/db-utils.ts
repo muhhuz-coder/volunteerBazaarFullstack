@@ -1,46 +1,14 @@
-
 // src/lib/db-utils.ts
 import path from 'path';
-import type fsType from 'fs/promises'; // Import fs type for type safety
-
-let fs: typeof fsType; // Declare fs variable
-
-// Dynamically import fs/promises only when this module is loaded on the server
-async function loadFs() {
-    if (!fs) {
-        // Use dynamic import if running on the server
-        if (typeof window === 'undefined') {
-            try {
-                // @ts-ignore - Dynamically import fs/promises
-                fs = (await import('fs/promises'));
-                 // Check if the default export is the module itself
-                 if (fs && typeof fs !== 'object') {
-                    // If import('fs/promises') returns the module directly (ESM style)
-                    // No need for .default
-                 } else if (fs && (fs as any).default) {
-                     // If it returns an object with a default property (CommonJS style or bundled)
-                     fs = (fs as any).default;
-                 } else {
-                    throw new Error("Loaded 'fs/promises' module structure unexpected.");
-                 }
-
-            } catch (e) {
-                console.error("Failed to load 'fs/promises'. This module should only run on the server.", e);
-                // Handle the error appropriately, maybe throw or set a flag
-                throw new Error("Filesystem operations are not available in this environment.");
-            }
-        } else {
-            throw new Error("Filesystem operations cannot be performed in the browser.");
-        }
-    }
-}
-
+// Direct import of fs/promises, assuming this module is only used server-side.
+// Next.js should handle tree-shaking for client bundles if this is server-only.
+import fs from 'fs/promises';
 
 // Ensure the data directory exists
 const dataDir = path.resolve(process.cwd(), 'src/data');
 
 const ensureDataDir = async () => {
-  await loadFs(); // Ensure fs is loaded before using it
+  // No need to call loadFs() as fs is imported directly.
   try {
     await fs.access(dataDir);
   } catch {
@@ -56,7 +24,7 @@ const ensureDataDir = async () => {
  * @returns The parsed JSON data or the default value.
  */
 export async function readData<T>(filename: string, defaultValue: T): Promise<T> {
-  await ensureDataDir(); // Ensures fs is loaded
+  await ensureDataDir();
   const filePath = path.join(dataDir, filename);
   try {
     const fileContent = await fs.readFile(filePath, 'utf-8');
@@ -85,7 +53,7 @@ export async function readData<T>(filename: string, defaultValue: T): Promise<T>
  * @param data The data to write (will be JSON.stringify'd).
  */
 export async function writeData<T>(filename: string, data: T): Promise<void> {
-  await ensureDataDir(); // Ensures fs is loaded
+  await ensureDataDir();
   const filePath = path.join(dataDir, filename);
   try {
     const jsonString = JSON.stringify(data, null, 2); // Pretty print JSON
