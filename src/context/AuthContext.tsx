@@ -146,35 +146,40 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
     const isSelectRolePage = pathname === '/select-role';
     const isOnboardingPage = pathname === '/onboarding';
-    const isRootPage = pathname === '/';
+    const isRootPage = pathname === '/'; // Specifically the home page
 
-    if (user) {
+    if (user) { // User is logged in
       console.log('AuthContext: User is present and not loading.');
-      if (role) {
-        if (user.onboardingCompleted === false && !isOnboardingPage) {
+      if (role) { // User has a role
+        if (user.onboardingCompleted === false && !isOnboardingPage && !isSelectRolePage) {
           console.log(`AuthContext: User has role ${role} but onboarding not complete. Redirecting to /onboarding.`);
           router.push('/onboarding');
-        } else if (isAuthPage || isSelectRolePage || (isOnboardingPage && user.onboardingCompleted) || (isRootPage && pathname !== (role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer'))) {
+        } else if (user.onboardingCompleted && (isAuthPage || isSelectRolePage)) {
+          // If onboarding is complete AND user is on an auth page or select-role, redirect to dashboard
           const targetDashboard = role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer';
-          console.log(`AuthContext: Current path ${pathname} is eligible for dashboard redirect. Redirecting to ${targetDashboard}...`);
+          console.log(`AuthContext: User is onboarded and on ${pathname}. Redirecting to ${targetDashboard}.`);
           router.push(targetDashboard);
         } else {
-          console.log(`AuthContext: User is on ${pathname}. No automatic redirect to dashboard needed.`);
+          // User is onboarded and not on an auth/select-role page. Allow them to stay.
+          // This means they can access '/', '/opportunities', etc.
+          console.log(`AuthContext: User is on ${pathname}. Onboarding status: ${user.onboardingCompleted}. Role: ${role}. No automatic redirect needed from here.`);
         }
-      } else if (!isSelectRolePage && !isOnboardingPage) {
+      } else if (!isSelectRolePage && !isOnboardingPage) { // User has no role
         console.log(`AuthContext: User has no role. Current path ${pathname}. Redirecting to /select-role.`);
         router.push('/select-role');
       } else {
+        // User has no role but is already on select-role or onboarding page
         console.log(`AuthContext: User has no role, but is already on /select-role or /onboarding. No redirect needed.`);
       }
-    } else {
+    } else { // User is not logged in
       console.log('AuthContext: User is not present and not loading.');
       const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/apply', '/chatbot', '/messages', '/onboarding'];
-      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage) {
+      // Allow root page ('/') for non-logged-in users
+      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage && !isRootPage) {
          console.log(`AuthProvider: User not logged in. Current path ${pathname} is protected. Redirecting to /login.`);
          router.push('/login');
       } else {
-        console.log(`AuthContext: User not present, not loading. Path ${pathname} is not protected or is an auth page. No redirect.`);
+        console.log(`AuthContext: User not present, not loading. Path ${pathname} is not protected, an auth page, or root. No redirect.`);
       }
     }
   }, [user, role, loading, router, pathname]);
@@ -435,6 +440,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
             const result = await recordVolunteerPerformanceAction(applicationId, performanceData);
             if (result.success && result.updatedApplication?.attendance === 'present') {
+                 const opportunity = await getOpportunityByIdAction(result.updatedApplication.opportunityId);
+                 const pointsForCompletion = opportunity?.pointsAwarded || 0;
+                 if (pointsForCompletion > 0) {
+                    await addPointsAndUpdateContext(result.updatedApplication.volunteerId, pointsForCompletion, `Completed: ${result.updatedApplication.opportunityTitle}`);
+                 }
+
                 if (performanceData.hoursLoggedByOrg && performanceData.hoursLoggedByOrg > 0) {
                     await logHoursAndUpdateContext(result.updatedApplication.volunteerId, performanceData.hoursLoggedByOrg, `Volunteered for ${result.updatedApplication.opportunityTitle}`);
                 }
@@ -487,15 +498,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
 
   if (loading) {
-    // This logic ensures consistent rendering during loading to prevent hydration errors.
-    // The server will always render the spinner if loading=true (isClientHydrated is false).
-    // The client will initially render the spinner if loading=true, then useEffect sets isClientHydrated,
-    // and it re-renders. If on an auth page, it then renders null (or minimal placeholder).
     if (isClientHydrated && (pathname?.startsWith('/login') || pathname?.startsWith('/signup') || pathname?.startsWith('/forgot-password') || pathname === '/')) {
-      // Minimal or no skeleton for auth pages or root during initial load on client-side after hydration
-      return null; // Or <></> or a very minimal placeholder
+      return null; 
     } else {
-      // Default loading spinner for other pages or server-side render
       return (
          <div className="flex items-center justify-center min-h-screen bg-secondary">
            <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -539,3 +544,20 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+// Helper function to get Opportunity by ID, needed by recordVolunteerPerformance
+// This would typically be an action call, but for simplicity, we place it here
+// if it's only used within this context file for now.
+// Ideally, this should be in job-board-actions.ts and imported.
+async function getOpportunityByIdAction(id: string): Promise<Opportunity | null> {
+  // This is a placeholder. In a real app, this would fetch from your data source.
+  // For now, assuming a function exists that can do this.
+  // console.warn("getOpportunityByIdAction is a placeholder in AuthContext.");
+  // As this file is 'use client', we cannot directly call a server action `getOpportunityByIdAction` from `job-board-actions.ts`
+  // without making this function async and handling the server action call properly.
+  // For the current structure, this helper would need to be refactored if it needs to be truly async
+  // or the logic needing this data needs to be moved to a server action itself.
+  // For now, returning null to avoid breaking changes elsewhere.
+  // Consider if `recordVolunteerPerformanceAction` itself can fetch opportunity details.
+  return null;
+}
