@@ -3,10 +3,11 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton'; // Not used in current snippet, but ensure imports are correct
 import { Loader2 } from 'lucide-react';
 
 // Import types/interfaces
+// ... (keep existing type imports) ...
 import type { VolunteerApplication } from '@/services/job-board';
 import type { Conversation } from '@/services/messaging';
 import type { VolunteerStats } from '@/services/gamification';
@@ -20,9 +21,10 @@ import {
     updateUserProfilePictureAction,
     updateUserProfileBioSkillsCauses as updateUserProfileBioSkillsCausesAction,
     sendPasswordResetEmailAction,
-    suspendUserAccount as suspendUserAccountAction, // Import suspend action
-    unsuspendUserAccount as unsuspendUserAccountAction, // Import unsuspend action
+    suspendUserAccount as suspendUserAccountAction,
+    unsuspendUserAccount as unsuspendUserAccountAction,
 } from '@/actions/auth-actions';
+// ... (keep other action imports) ...
 import {
     acceptVolunteerApplication,
     rejectVolunteerApplication,
@@ -31,10 +33,10 @@ import {
 } from '@/actions/application-actions';
 import { addPointsAction, awardBadgeAction, logHoursAction } from '@/actions/gamification-actions';
 import { getUserConversationsAction, startConversationAction } from '@/actions/messaging-actions';
-import { blockUserAction, unblockUserAction, reportUserAction as submitReportUserAction } from '@/actions/user-actions'; // New user actions
+import { blockUserAction, unblockUserAction, reportUserAction as submitReportUserAction } from '@/actions/user-actions';
 
 
-export type UserRole = 'volunteer' | 'organization' | 'admin' | null; // Added 'admin' role
+export type UserRole = 'volunteer' | 'organization' | 'admin' | null;
 
 export interface UserProfile {
   id: string;
@@ -47,8 +49,8 @@ export interface UserProfile {
   skills?: string[];
   causes?: string[];
   onboardingCompleted?: boolean;
-  blockedUserIds?: string[]; // Users blocked by this user
-  isSuspended?: boolean;      // If true, user account is suspended
+  blockedUserIds?: string[];
+  isSuspended?: boolean;
 }
 
 interface AuthContextType {
@@ -80,9 +82,6 @@ interface AuthContextType {
   blockUser: (userIdToBlock: string) => Promise<{ success: boolean; message: string; updatedUser?: UserProfile | null }>;
   unblockUser: (userIdToUnblock: string) => Promise<{ success: boolean; message: string; updatedUser?: UserProfile | null }>;
   reportUser: (reportedUserId: string, reason: string, details?: string) => Promise<{ success: boolean; message: string }>;
-  // Admin actions (if needed directly in context, otherwise call from admin panel)
-  // suspendUser: (userIdToSuspend: string) => Promise<{ success: boolean; message: string }>;
-  // unsuspendUser: (userIdToUnsuspend: string) => Promise<{ success: boolean; message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -101,134 +100,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    setIsClientHydrated(true);
-    const restoreSession = async () => {
-        console.log('AuthProvider: Checking sessionStorage for existing session.');
-        setLoading(true);
-        const storedUser = sessionStorage.getItem('loggedInUser');
-        if (storedUser) {
-            try {
-                const parsedUser: UserProfile = JSON.parse(storedUser);
-                setUser(parsedUser);
-                setRole(parsedUser.role);
-                console.log('AuthProvider: Restored basic user session from sessionStorage.', {id: parsedUser.id, role: parsedUser.role});
-
-                if (parsedUser.isSuspended) {
-                    console.log('AuthProvider: User account is suspended. Clearing session.');
-                    sessionStorage.removeItem('loggedInUser');
-                    setUser(null);
-                    setRole(null);
-                    router.push('/login?error=suspended'); // Optional: redirect with error
-                    setLoading(false);
-                    return;
-                }
-
-                const refreshResult = await getRefreshedUserAction(parsedUser.id);
-                if (refreshResult.success && refreshResult.user) {
-                    if (refreshResult.user.isSuspended) {
-                        console.log('AuthProvider: User account is suspended (checked on refresh). Clearing session.');
-                        sessionStorage.removeItem('loggedInUser');
-                        setUser(null);
-                        setRole(null);
-                        router.push('/login?error=suspended');
-                    } else {
-                        setUser(refreshResult.user);
-                        setRole(refreshResult.user.role);
-                        sessionStorage.setItem('loggedInUser', JSON.stringify(refreshResult.user));
-                        console.log('AuthProvider: Successfully refreshed user session from server.', {id: refreshResult.user.id, role: refreshResult.user.role});
-                    }
-                } else {
-                    console.warn('AuthProvider: Failed to refresh user session from server. Using stored data. This might happen if user was deleted.', refreshResult.message);
-                     // If refresh fails, possible the user was deleted or issue with DB, sign out
-                    sessionStorage.removeItem('loggedInUser');
-                    setUser(null);
-                    setRole(null);
-                    router.push('/login?error=session_expired');
-                }
-            } catch (e) {
-                console.error("AuthProvider: Error processing stored user session.", e);
-                sessionStorage.removeItem('loggedInUser');
-                setUser(null);
-                setRole(null);
-            }
-        } else {
-            console.log('AuthProvider: No user session found in sessionStorage.');
-            setUser(null);
-            setRole(null);
-        }
-        setLoading(false);
-    };
-    if (typeof window !== "undefined") {
-        restoreSession();
-    } else {
-        setLoading(false);
-    }
-  }, [router]); // Added router to dependencies
-
-  useEffect(() => {
-    console.log('AuthContext redirection useEffect triggered. State:', {
-      loading,
-      userId: user ? user.id : null,
-      role,
-      pathname,
-      onboardingCompleted: user?.onboardingCompleted,
-      isSuspended: user?.isSuspended,
-    });
-
-    if (loading) return;
-
-    const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
-    const isSelectRolePage = pathname === '/select-role';
-    const isOnboardingPage = pathname === '/onboarding';
-    const isAdminPage = pathname.startsWith('/admin');
-    const isRootPage = pathname === '/';
-
-    if (user) {
-      if (user.isSuspended) {
-        if (pathname !== '/login') {
-            console.log(`AuthContext: User ${user.id} is suspended. Redirecting to /login.`);
-            signOut();
-        }
-        return;
-      }
-
-      console.log('AuthContext: User is present and not loading.');
-      if (role) {
-        if (role === 'admin') {
-            if (!isAdminPage && !isAuthPage) { // Allow admin to be on auth pages if needed, e.g. to sign out
-                 console.log(`AuthContext: Admin user on non-admin page (${pathname}). Redirecting to /admin.`);
-                 router.push('/admin');
-            }
-        } else if (user.onboardingCompleted === false && !isOnboardingPage && !isSelectRolePage && !isAdminPage) {
-          console.log(`AuthContext: User has role ${role} but onboarding not complete. Redirecting to /onboarding.`);
-          router.push('/onboarding');
-        } else if (user.onboardingCompleted && (isAuthPage || isSelectRolePage || (isAdminPage && role !== 'admin'))) {
-          // If onboarded and on auth/select-role, or on admin page but not admin, redirect to their dashboard
-          const targetDashboard = role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer';
-          console.log(`AuthContext: User is onboarded and on ${pathname} (or admin page as non-admin). Redirecting to ${targetDashboard}.`);
-          router.push(targetDashboard);
-        } else {
-          console.log(`AuthContext: User is on ${pathname}. Onboarding status: ${user.onboardingCompleted}. Role: ${role}. No automatic redirect needed from here.`);
-        }
-      } else if (!isSelectRolePage && !isOnboardingPage && !isAdminPage) {
-        console.log(`AuthContext: User has no role. Current path ${pathname}. Redirecting to /select-role.`);
-        router.push('/select-role');
-      } else {
-        console.log(`AuthContext: User has no role, but is already on /select-role, /onboarding, or /admin (will be handled). No redirect needed.`);
-      }
-    } else {
-      console.log('AuthContext: User is not present and not loading.');
-      const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/apply', '/chatbot', '/messages', '/onboarding', '/admin'];
-      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage && !isRootPage) {
-         console.log(`AuthProvider: User not logged in. Current path ${pathname} is protected. Redirecting to /login.`);
-         router.push('/login');
-      } else {
-        console.log(`AuthContext: User not present, not loading. Path ${pathname} is not protected, an auth page, or root. No redirect.`);
-      }
-    }
-  }, [user, role, loading, router, pathname]);
-
+  // Define signOut and other useCallback functions BEFORE useEffect hooks that use them.
+  const signOut = useCallback(async () => {
+    console.log('AuthContext: Signing out');
+    setLoading(true);
+    setUser(null);
+    setRole(null);
+    sessionStorage.removeItem('loggedInUser');
+    await sleep(100);
+    setLoading(false);
+    router.push('/login');
+    console.log('AuthContext: Sign out complete, redirected to /login');
+  }, [router]);
 
   const signIn = useCallback(async (email: string, pass: string): Promise<{ success: boolean; message: string; user?: UserProfile | null }> => {
     console.log('AuthContext: Attempting sign in for:', email);
@@ -237,7 +120,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const result = await signInUserAction(email, pass);
         if (result.success && result.user) {
             if (result.user.isSuspended) {
-                setUser(null); // Do not set user if suspended
+                setUser(null);
                 setRole(null);
                 sessionStorage.removeItem('loggedInUser');
                 console.log('AuthContext: Sign in attempt for suspended user:', result.user.id);
@@ -285,18 +168,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setLoading(false);
     }
   }, []);
-
-  const signOut = useCallback(async () => {
-    console.log('AuthContext: Signing out');
-    setLoading(true);
-    setUser(null);
-    setRole(null);
-    sessionStorage.removeItem('loggedInUser');
-    await sleep(100);
-    setLoading(false);
-    router.push('/login');
-    console.log('AuthContext: Sign out complete, redirected to /login');
-  }, [router]);
 
   const setRoleAndUpdateUser = useCallback(async (roleToSet: UserRole): Promise<{ success: boolean; message: string }> => {
      if (!user) return { success: false, message: 'User not logged in.' };
@@ -426,7 +297,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
     }, [user]);
 
-
   const submitApplication = useCallback(async (applicationData: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>): Promise<{ success: boolean; message: string }> => {
     if (!user || user.role !== 'volunteer') {
       return { success: false, message: 'Only logged-in volunteers can apply.' };
@@ -491,7 +361,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setLoading(true);
         try {
             const result = await recordVolunteerPerformanceAction(applicationId, performanceData);
-            // Points and hours logging for volunteer performance is handled within recordVolunteerPerformanceAction
             return result;
         } catch (error: any) {
             return { success: false, message: error.message || 'Failed to record performance.', updatedApplication: null };
@@ -538,9 +407,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!user) return { success: false, message: 'User not logged in.', updatedUser: null };
     setLoading(true);
     try {
-      const result = await blockUserAction(user.id, userIdToBlock); // Pass current user's ID as blockerId
+      const result = await blockUserAction(user.id, userIdToBlock);
       if (result.success && result.user) {
-        setUser(result.user); // Update current user's profile with new block list
+        setUser(result.user);
         sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
       }
       return { success: result.success, message: result.message, updatedUser: result.user };
@@ -555,9 +424,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!user) return { success: false, message: 'User not logged in.', updatedUser: null };
     setLoading(true);
     try {
-      const result = await unblockUserAction(user.id, userIdToUnblock); // Pass current user's ID as blockerId
+      const result = await unblockUserAction(user.id, userIdToUnblock);
       if (result.success && result.user) {
-        setUser(result.user); // Update current user's profile
+        setUser(result.user);
         sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
       }
       return { success: result.success, message: result.message, updatedUser: result.user };
@@ -572,7 +441,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!user) return { success: false, message: 'User not logged in.' };
     setLoading(true);
     try {
-      // Pass current user's ID and name as reporter
       const result = await submitReportUserAction(user.id, user.displayName, reportedUserId, reason, details);
       return result;
     } catch (error: any) {
@@ -582,24 +450,140 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [user]);
 
-  // Logic for suspending/unsuspending users, typically called from an admin panel
-  // const suspendUser = useCallback(async (userIdToSuspend: string): Promise<{ success: boolean; message: string }> => {
-  //   if (!user || user.role !== 'admin') { // Ensure only admin can perform this
-  //     return { success: false, message: 'Unauthorized action.' };
-  //   }
-  //   return await suspendUserAccountAction(userIdToSuspend, user.id);
-  // }, [user]);
 
-  // const unsuspendUser = useCallback(async (userIdToUnsuspend: string): Promise<{ success: boolean; message: string }> => {
-  //   if (!user || user.role !== 'admin') { // Ensure only admin can perform this
-  //     return { success: false, message: 'Unauthorized action.' };
-  //   }
-  //   return await unsuspendUserAccountAction(userIdToUnsuspend, user.id);
-  // }, [user]);
+  // useEffect hook for session restoration
+  useEffect(() => {
+    setIsClientHydrated(true);
+    const restoreSession = async () => {
+        console.log('AuthProvider: Checking sessionStorage for existing session.');
+        setLoading(true);
+        const storedUser = sessionStorage.getItem('loggedInUser');
+        if (storedUser) {
+            try {
+                const parsedUser: UserProfile = JSON.parse(storedUser);
+                setUser(parsedUser);
+                setRole(parsedUser.role);
+                console.log('AuthProvider: Restored basic user session from sessionStorage.', {id: parsedUser.id, role: parsedUser.role});
+
+                if (parsedUser.isSuspended) {
+                    console.log('AuthProvider: User account is suspended. Clearing session.');
+                    sessionStorage.removeItem('loggedInUser');
+                    setUser(null);
+                    setRole(null);
+                    router.push('/login?error=suspended');
+                    setLoading(false);
+                    return;
+                }
+
+                const refreshResult = await getRefreshedUserAction(parsedUser.id);
+                if (refreshResult.success && refreshResult.user) {
+                    if (refreshResult.user.isSuspended) {
+                        console.log('AuthProvider: User account is suspended (checked on refresh). Clearing session.');
+                        sessionStorage.removeItem('loggedInUser');
+                        setUser(null);
+                        setRole(null);
+                        router.push('/login?error=suspended');
+                    } else {
+                        setUser(refreshResult.user);
+                        setRole(refreshResult.user.role);
+                        sessionStorage.setItem('loggedInUser', JSON.stringify(refreshResult.user));
+                        console.log('AuthProvider: Successfully refreshed user session from server.', {id: refreshResult.user.id, role: refreshResult.user.role});
+                    }
+                } else {
+                    console.warn('AuthProvider: Failed to refresh user session from server. Using stored data. This might happen if user was deleted.', refreshResult.message);
+                    sessionStorage.removeItem('loggedInUser');
+                    setUser(null);
+                    setRole(null);
+                    router.push('/login?error=session_expired');
+                }
+            } catch (e) {
+                console.error("AuthProvider: Error processing stored user session.", e);
+                sessionStorage.removeItem('loggedInUser');
+                setUser(null);
+                setRole(null);
+            }
+        } else {
+            console.log('AuthProvider: No user session found in sessionStorage.');
+            setUser(null);
+            setRole(null);
+        }
+        setLoading(false);
+    };
+    if (typeof window !== "undefined") {
+        restoreSession();
+    } else {
+        setLoading(false);
+    }
+  }, [router]); // Added router to dependencies as it's used inside
+
+  // useEffect hook for redirection logic
+  useEffect(() => {
+    console.log('AuthContext redirection useEffect triggered. State:', {
+      loading,
+      userId: user ? user.id : null,
+      role,
+      pathname,
+      onboardingCompleted: user?.onboardingCompleted,
+      isSuspended: user?.isSuspended,
+    });
+
+    if (loading) return;
+
+    const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
+    const isSelectRolePage = pathname === '/select-role';
+    const isOnboardingPage = pathname === '/onboarding';
+    const isAdminPage = pathname.startsWith('/admin');
+    const isRootPage = pathname === '/';
+
+    if (user) {
+      if (user.isSuspended) {
+        if (pathname !== '/login') {
+            console.log(`AuthContext: User ${user.id} is suspended. Logging out and redirecting to /login.`);
+            signOut(); // This will clear session and redirect to login.
+        }
+        return;
+      }
+
+      console.log(`AuthContext: User ${user.id} is present and not loading.`);
+      if (role) {
+        if (role === 'admin') {
+            if (!isAdminPage && !isAuthPage) {
+                 console.log(`AuthContext: Admin user ${user.id} on non-admin page (${pathname}). Redirecting to /admin.`);
+                 router.push('/admin');
+            } else {
+                 console.log(`AuthContext: Admin user ${user.id} on ${pathname}. No redirect needed.`);
+            }
+        } else if (user.onboardingCompleted === false && !isOnboardingPage && !isSelectRolePage && !isAdminPage) {
+          console.log(`AuthContext: User ${user.id} (Role: ${role}) onboarding not complete. Current path ${pathname}. Redirecting to /onboarding.`);
+          router.push('/onboarding');
+        } else if (user.onboardingCompleted && (isAuthPage || isSelectRolePage || (isAdminPage && role !== 'admin'))) {
+          const targetDashboard = role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer';
+          console.log(`AuthContext: User ${user.id} (Role: ${role}, Onboarded: ${user.onboardingCompleted}) is on ${pathname}. Redirecting to ${targetDashboard}.`);
+          router.push(targetDashboard);
+        } else {
+          console.log(`AuthContext: User ${user.id} (Role: ${role}, Onboarded: ${user.onboardingCompleted}) on ${pathname}. No automatic redirect needed from this branch.`);
+        }
+      } else if (!isSelectRolePage && !isOnboardingPage && !isAdminPage) {
+        console.log(`AuthContext: User ${user.id} has no role. Current path ${pathname}. Redirecting to /select-role.`);
+        router.push('/select-role');
+      } else {
+        console.log(`AuthContext: User ${user.id} has no role, but is on ${pathname} (select-role, onboarding, or admin page). No redirect needed.`);
+      }
+    } else {
+      console.log('AuthContext: User is not present and not loading.');
+      const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/apply', '/chatbot', '/messages', '/onboarding', '/admin'];
+      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage && !isRootPage) {
+         console.log(`AuthProvider: User not logged in. Current path ${pathname} is protected. Redirecting to /login.`);
+         router.push('/login');
+      } else {
+        console.log(`AuthContext: User not present, not loading. Path ${pathname} is not protected, an auth page, or root. No redirect.`);
+      }
+    }
+  }, [user, role, loading, router, pathname, signOut]);
 
 
   if (loading && !isClientHydrated) {
-    return null; // Render nothing on server during initial auth check to prevent hydration mismatch
+    return null;
   }
 
   if (loading && isClientHydrated) {
@@ -609,7 +593,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
          </div>
       );
   }
-
 
   return (
     <AuthContext.Provider value={{
@@ -635,8 +618,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         blockUser,
         unblockUser,
         reportUser,
-        // suspendUser,
-        // unsuspendUser,
      }}>
       {children}
     </AuthContext.Provider>
