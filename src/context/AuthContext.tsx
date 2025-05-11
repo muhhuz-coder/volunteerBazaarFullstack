@@ -1,4 +1,3 @@
-
 // src/context/AuthContext.tsx
 'use client';
 
@@ -56,7 +55,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   setRoleAndUpdateUser: (role: UserRole) => Promise<{ success: boolean; message: string }>;
   updateProfilePicture: (imageDataUri: string) => Promise<{ success: boolean; message: string; user?: UserProfile | null }>;
-  updateUserProfile: (profileData: Partial<Pick<UserProfile, 'displayName' | 'bio' | 'skills' | 'causes'>>) => Promise<{ success: boolean; message: string; user?: UserProfile | null }>;
+  updateUserProfile: (profileData: Partial<Pick<UserProfile, 'displayName' | 'bio' | 'skills' | 'causes' | 'onboardingCompleted'>>) => Promise<{ success: boolean; message: string; user?: UserProfile | null }>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
   submitApplication: (application: Omit<VolunteerApplication, 'id' | 'status' | 'submittedAt' | 'volunteerId'>) => Promise<{ success: boolean; message: string }>;
   acceptApplication: (applicationId: string, volunteerId: string) => Promise<{ success: boolean; message: string; conversationId?: string, updatedApp?: VolunteerApplication | null }>;
@@ -87,10 +86,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<UserRole>(null);
+  const [isClientHydrated, setIsClientHydrated] = useState(false); // For hydration fix
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    setIsClientHydrated(true); // Component has mounted on client
     const restoreSession = async () => {
         console.log('AuthProvider: Checking sessionStorage for existing session.');
         setLoading(true);
@@ -127,7 +128,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (typeof window !== "undefined") {
         restoreSession();
     } else {
-        setLoading(false);
+        setLoading(false); // Should not happen with 'use client' but good for robustness
     }
   }, []);
 
@@ -140,17 +141,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       onboardingCompleted: user?.onboardingCompleted,
     });
 
-    if (loading) return;
+    if (loading) return; // Wait for session restoration to complete
 
     const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
     const isSelectRolePage = pathname === '/select-role';
-    const isOnboardingPage = pathname === '/onboarding'; // Add onboarding page check
+    const isOnboardingPage = pathname === '/onboarding';
     const isRootPage = pathname === '/';
 
     if (user) {
       console.log('AuthContext: User is present and not loading.');
       if (role) {
-        if (user.onboardingCompleted === false && !isOnboardingPage) { // Check for onboarding
+        if (user.onboardingCompleted === false && !isOnboardingPage) {
           console.log(`AuthContext: User has role ${role} but onboarding not complete. Redirecting to /onboarding.`);
           router.push('/onboarding');
         } else if (isAuthPage || isSelectRolePage || (isOnboardingPage && user.onboardingCompleted) || (isRootPage && pathname !== (role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer'))) {
@@ -160,7 +161,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         } else {
           console.log(`AuthContext: User is on ${pathname}. No automatic redirect to dashboard needed.`);
         }
-      } else if (!isSelectRolePage && !isOnboardingPage) { // User authenticated but no role, and not on select-role or onboarding
+      } else if (!isSelectRolePage && !isOnboardingPage) {
         console.log(`AuthContext: User has no role. Current path ${pathname}. Redirecting to /select-role.`);
         router.push('/select-role');
       } else {
@@ -211,9 +212,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
         const result = await signUpUserAction(email, pass, name, roleToSet);
         if (result.success && result.user) {
-            // User is created with onboardingCompleted: false by default in the action
             setUser(result.user);
-            setRole(result.user.role); // Role is set here
+            setRole(result.user.role);
             sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
             console.log('AuthContext: Sign up successful.', {id: result.user.id, role: result.user.role, onboardingCompleted: result.user.onboardingCompleted });
             return { success: true, message: result.message, user: result.user };
@@ -235,8 +235,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
     setRole(null);
     sessionStorage.removeItem('loggedInUser');
-    await sleep(100);
-    setLoading(false);
+    await sleep(100); // Short delay to ensure state updates propagate
+    setLoading(false); // Set loading false before push to avoid race condition with redirection logic
     router.push('/login');
     console.log('AuthContext: Sign out complete, redirected to /login');
   }, [router]);
@@ -286,11 +286,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!user) return { success: false, message: 'User not logged in.' };
     setLoading(true);
     try {
-      // Ensure onboardingCompleted is explicitly passed if intended.
-      // The server action expects Partial<Pick<UserProfile, 'displayName' | 'bio' | 'skills' | 'causes' | 'onboardingCompleted'>>
       const result = await updateUserProfileBioSkillsCausesAction(user.id, profileData);
       if (result.success && result.user) {
         setUser(result.user);
+        setRole(result.user.role); // Role might be updated if onboarding is completed
         sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
         return { success: true, message: result.message, user: result.user };
       } else {
@@ -435,14 +434,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setLoading(true);
         try {
             const result = await recordVolunteerPerformanceAction(applicationId, performanceData);
-            // If performance includes hours, update volunteer's stats from context
-            if (result.success && result.updatedApplication?.attendance === 'present' && performanceData.hoursLoggedByOrg && performanceData.hoursLoggedByOrg > 0) {
-               await logHoursAndUpdateContext(result.updatedApplication.volunteerId, performanceData.hoursLoggedByOrg, `Volunteered for ${result.updatedApplication.opportunityTitle}`);
-            }
-             // If performance includes rating, potentially award points
-            if (result.success && result.updatedApplication?.attendance === 'present' && performanceData.orgRating && performanceData.orgRating >= 4) {
-                const ratingBonusPoints = performanceData.orgRating === 5 ? 20 : 10;
-                await addPointsAndUpdateContext(result.updatedApplication.volunteerId, ratingBonusPoints, `Received ${performanceData.orgRating}-star rating for: ${result.updatedApplication.opportunityTitle}`);
+            if (result.success && result.updatedApplication?.attendance === 'present') {
+                if (performanceData.hoursLoggedByOrg && performanceData.hoursLoggedByOrg > 0) {
+                    await logHoursAndUpdateContext(result.updatedApplication.volunteerId, performanceData.hoursLoggedByOrg, `Volunteered for ${result.updatedApplication.opportunityTitle}`);
+                }
+                if (performanceData.orgRating && performanceData.orgRating >= 4) {
+                    const ratingBonusPoints = performanceData.orgRating === 5 ? 20 : 10;
+                    await addPointsAndUpdateContext(result.updatedApplication.volunteerId, ratingBonusPoints, `Received ${performanceData.orgRating}-star rating for: ${result.updatedApplication.opportunityTitle}`);
+                }
             }
             return result;
         } catch (error: any) {
@@ -487,14 +486,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, [user]);
 
 
-  if (loading && typeof window !== 'undefined' && (pathname?.startsWith('/login') || pathname?.startsWith('/signup') || pathname?.startsWith('/forgot-password') || pathname === '/')) {
-    // Minimal or no skeleton for auth pages or root during initial load
-  } else if (loading) {
-    return (
-       <div className="flex items-center justify-center min-h-screen bg-secondary">
-         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-       </div>
-    );
+  if (loading) {
+    // This logic ensures consistent rendering during loading to prevent hydration errors.
+    // The server will always render the spinner if loading=true (isClientHydrated is false).
+    // The client will initially render the spinner if loading=true, then useEffect sets isClientHydrated,
+    // and it re-renders. If on an auth page, it then renders null (or minimal placeholder).
+    if (isClientHydrated && (pathname?.startsWith('/login') || pathname?.startsWith('/signup') || pathname?.startsWith('/forgot-password') || pathname === '/')) {
+      // Minimal or no skeleton for auth pages or root during initial load on client-side after hydration
+      return null; // Or <></> or a very minimal placeholder
+    } else {
+      // Default loading spinner for other pages or server-side render
+      return (
+         <div className="flex items-center justify-center min-h-screen bg-secondary">
+           <Loader2 className="h-12 w-12 animate-spin text-primary" />
+         </div>
+      );
+    }
   }
 
 
@@ -532,4 +539,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
