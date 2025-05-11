@@ -26,6 +26,11 @@ export async function signInUser(email: string, pass: string): Promise<{ success
     }
 
     if (existingUser && userEmailKey) {
+      if (existingUser.isSuspended) {
+        console.log('Server Action: Sign in failed, user account is suspended:', email);
+        return { success: false, message: 'Your account has been suspended. Please contact support.', user: null };
+      }
+
       let userToReturn = { ...existingUser };
       if (userToReturn.role === 'volunteer') {
         try {
@@ -76,10 +81,12 @@ export async function signUpUser(email: string, pass: string, name: string, role
       role: roleToSet,
       stats: roleToSet === 'volunteer' ? { points: 0, badges: [], hours: 0 } : undefined,
       profilePictureUrl: undefined,
-      bio: '', // Initialize bio
-      skills: [], // Initialize skills
-      causes: [], // Initialize causes
-      onboardingCompleted: false, // Initialize onboardingCompleted
+      bio: '', 
+      skills: [], 
+      causes: [], 
+      onboardingCompleted: false,
+      blockedUserIds: [], // Initialize blockedUserIds
+      isSuspended: false,   // Initialize isSuspended
     };
     const updatedUsersMap = usersData.set(email, newUser);
     await writeData(USERS_FILE, mapToObject(updatedUsersMap));
@@ -126,10 +133,10 @@ export async function updateUserRole(userId: string, newRole: UserRole): Promise
     } else if (newRole !== 'volunteer') {
         delete userToUpdate.stats;
     }
-    // Ensure onboardingCompleted flag is preserved or initialized if missing
-    if (userToUpdate.onboardingCompleted === undefined) {
-        userToUpdate.onboardingCompleted = false; // Default if was missing
-    }
+    
+    userToUpdate.onboardingCompleted = userToUpdate.onboardingCompleted ?? false;
+    userToUpdate.blockedUserIds = userToUpdate.blockedUserIds ?? [];
+    userToUpdate.isSuspended = userToUpdate.isSuspended ?? false;
 
     const updatedUsersMap = usersData.set(userEmail, userToUpdate);
     await writeData(USERS_FILE, mapToObject(updatedUsersMap));
@@ -160,6 +167,14 @@ export async function getRefreshedUserAction(userId: string): Promise<{ success:
             console.log('Server Action: Refresh failed, user not found:', userId);
             return { success: false, message: 'User not found.' };
         }
+        
+        // If user is suspended, prevent further processing / return suspended state
+        if (userProfile.isSuspended) {
+             console.log('Server Action: User is suspended. Refresh aborted for active session logic.', userId);
+             // Return the user object but indicate potential issue or let AuthContext handle it
+             return { success: true, user: { ...userProfile } }; // Or return success:false, message: "Account suspended"
+        }
+
         let userToReturn = { ...userProfile };
         if (userToReturn.role === 'volunteer') {
             try {
@@ -172,7 +187,7 @@ export async function getRefreshedUserAction(userId: string): Promise<{ success:
             }
         }
         console.log('Server Action: User refresh successful for:', userId);
-        const { ...finalUser } = userToReturn;
+        const { ...finalUser } = userToReturn; // Ensure all properties are spread
         return { success: true, user: finalUser };
     } catch (error: any) {
         console.error("Server Action: User refresh error -", error);
@@ -238,7 +253,7 @@ export async function updateUserProfileBioSkillsCauses(
     if (profileData.bio !== undefined) userToUpdate.bio = profileData.bio;
     if (profileData.skills !== undefined) userToUpdate.skills = profileData.skills;
     if (profileData.causes !== undefined) userToUpdate.causes = profileData.causes;
-    if (profileData.onboardingCompleted !== undefined) userToUpdate.onboardingCompleted = profileData.onboardingCompleted; // Update onboarding status
+    if (profileData.onboardingCompleted !== undefined) userToUpdate.onboardingCompleted = profileData.onboardingCompleted;
 
     const updatedUsersMap = usersData.set(userEmailKey, userToUpdate);
     await writeData(USERS_FILE, mapToObject(updatedUsersMap));
@@ -267,4 +282,69 @@ export async function sendPasswordResetEmailAction(email: string): Promise<{ suc
   }
   await new Promise(resolve => setTimeout(resolve, 500));
   return { success: true, message: "If your email is registered, a password reset link has been sent (mock)." };
+}
+
+// New action to set user as suspended (intended for admin use, not exposed to client directly in this iteration)
+export async function suspendUserAccount(userIdToSuspend: string, adminUserId: string): Promise<{ success: boolean; message: string }> {
+    // In a real app, verify adminUserId has rights
+    console.log(`Admin Action: Attempting to suspend user ${userIdToSuspend} by admin ${adminUserId}`);
+    try {
+        const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+        const usersData = objectToMap(usersObject);
+        let userEmailKey: string | undefined;
+        let userToSuspend: UserProfile | undefined;
+
+        for (const [email, profile] of usersData.entries()) {
+            if (profile.id === userIdToSuspend) {
+                userEmailKey = email;
+                userToSuspend = profile;
+                break;
+            }
+        }
+
+        if (!userToSuspend || !userEmailKey) {
+            return { success: false, message: 'User to suspend not found.' };
+        }
+
+        userToSuspend.isSuspended = true;
+        usersData.set(userEmailKey, userToSuspend);
+        await writeData(USERS_FILE, mapToObject(usersData));
+        console.log(`Admin Action: User ${userIdToSuspend} has been suspended.`);
+        return { success: true, message: 'User account suspended successfully.' };
+    } catch (error: any) {
+        console.error(`Admin Action: Error suspending user ${userIdToSuspend}:`, error);
+        return { success: false, message: 'Server error during account suspension.' };
+    }
+}
+
+// New action to unsuspend a user account
+export async function unsuspendUserAccount(userIdToUnsuspend: string, adminUserId: string): Promise<{ success: boolean; message: string }> {
+    console.log(`Admin Action: Attempting to unsuspend user ${userIdToUnsuspend} by admin ${adminUserId}`);
+    try {
+        const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+        const usersData = objectToMap(usersObject);
+        let userEmailKey: string | undefined;
+        let userToUnsuspend: UserProfile | undefined;
+
+        for (const [email, profile] of usersData.entries()) {
+            if (profile.id === userIdToUnsuspend) {
+                userEmailKey = email;
+                userToUnsuspend = profile;
+                break;
+            }
+        }
+
+        if (!userToUnsuspend || !userEmailKey) {
+            return { success: false, message: 'User to unsuspend not found.' };
+        }
+
+        userToUnsuspend.isSuspended = false;
+        usersData.set(userEmailKey, userToUnsuspend);
+        await writeData(USERS_FILE, mapToObject(usersData));
+        console.log(`Admin Action: User ${userIdToUnsuspend} has been unsuspended.`);
+        return { success: true, message: 'User account unsuspended successfully.' };
+    } catch (error: any) {
+        console.error(`Admin Action: Error unsuspending user ${userIdToUnsuspend}:`, error);
+        return { success: false, message: 'Server error during account unsuspension.' };
+    }
 }

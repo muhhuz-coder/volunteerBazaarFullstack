@@ -3,6 +3,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { UserProfile } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext'; // Import useAuth
 import { VolunteerCard } from '@/components/volunteer-card';
 import { Button } from '@/components/ui/button';
 import { LayoutGrid, List, Users } from 'lucide-react';
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface VolunteerListProps {
   initialVolunteers: UserProfile[];
   currentView?: 'grid' | 'list';
-  currentSortBy?: string; // e.g., 'points_desc'
+  currentSortBy?: string; 
 }
 
 const sortOptions = [
@@ -25,9 +26,10 @@ const sortOptions = [
 
 export function VolunteerList({
   initialVolunteers,
-  currentView = 'grid', // Default to horizontal scroll grid
+  currentView = 'grid', 
   currentSortBy = 'points_desc',
 }: VolunteerListProps) {
+  const { user: loggedInUser } = useAuth(); // Get the currently logged-in user
   const volunteers = initialVolunteers;
   const router = useRouter();
   const pathname = usePathname();
@@ -95,13 +97,15 @@ export function VolunteerList({
       {currentView === 'grid' ? (
         <div className="flex overflow-x-auto space-x-4 pb-4 scroll-smooth scroll-snap-x-mandatory hide-scrollbar">
           {volunteers.map((volunteer) => (
-            <VolunteerCard key={volunteer.id} volunteer={volunteer} view="grid" />
+            // Pass currentUserId to VolunteerCard
+            <VolunteerCard key={volunteer.id} volunteer={volunteer} view="grid" currentUserId={loggedInUser?.id} />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6">
           {volunteers.map((volunteer) => (
-            <VolunteerCard key={volunteer.id} volunteer={volunteer} view="list" />
+            // Pass currentUserId to VolunteerCard
+            <VolunteerCard key={volunteer.id} volunteer={volunteer} view="list" currentUserId={loggedInUser?.id} />
           ))}
         </div>
       )}

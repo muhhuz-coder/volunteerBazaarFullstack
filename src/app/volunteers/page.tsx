@@ -1,13 +1,17 @@
 // src/app/volunteers/page.tsx
-import { Suspense } from 'react';
+'use client'; // Make this a client component to use useAuth
+
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation'; // For reading search params on client
 import { Header } from '@/components/layout/header';
 import { VolunteerFilter } from '@/components/volunteer-filter';
 import { VolunteerList } from '@/components/volunteer-list';
 import { getPublicVolunteersAction } from '@/actions/user-actions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, ListFilter } from 'lucide-react';
+import { Users, ListFilter, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserProfile } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext'; // Import useAuth
 
 function VolunteerListSkeleton({ view = 'grid' }: { view?: 'grid' | 'list' }) {
   const CardSkeleton = () => (
@@ -65,28 +69,39 @@ function VolunteerListSkeleton({ view = 'grid' }: { view?: 'grid' | 'list' }) {
   );
 }
 
-export default async function VolunteersPage({
-  searchParams,
-}: {
-  searchParams?: {
-    keywords?: string;
-    sortBy?: string;
-    view?: 'grid' | 'list';
-  };
-}) {
-  const keywords = searchParams?.keywords || '';
-  const sortBy = searchParams?.sortBy || 'points_desc'; // Default sort by points
-  const view = searchParams?.view || 'grid'; // Default to grid view
+export default function VolunteersPage() {
+  const searchParams = useSearchParams(); // Hook for client components
+  const { user: loggedInUser, loading: authLoading } = useAuth(); // Get current user
 
-  // Fetch volunteers using the server action
-  const volunteers: UserProfile[] = await getPublicVolunteersAction({ keywords, sortBy });
+  const [volunteers, setVolunteers] = useState<UserProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const keywords = searchParams.get('keywords') || '';
+  const sortBy = searchParams.get('sortBy') || 'points_desc';
+  const view = (searchParams.get('view') as 'grid' | 'list') || 'grid';
+
+  useEffect(() => {
+    // Fetch volunteers only after auth state is resolved
+    if (!authLoading) {
+      setIsLoading(true);
+      getPublicVolunteersAction({ keywords, sortBy }, loggedInUser?.id)
+        .then(data => {
+          setVolunteers(data);
+          setIsLoading(false);
+        })
+        .catch(error => {
+          console.error("Failed to fetch volunteers:", error);
+          setIsLoading(false);
+          // Optionally set an error state and display an error message
+        });
+    }
+  }, [keywords, sortBy, loggedInUser, authLoading]); // Re-fetch if params or loggedInUser changes
 
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
       <Header />
       <div className="container mx-auto px-4 py-8 flex-grow">
         <div className="flex flex-col md:flex-row gap-8">
-          {/* Filters Sidebar */}
           <aside className="w-full md:w-1/4 lg:w-1/5">
             <VolunteerFilter
               initialKeywords={keywords}
@@ -94,24 +109,24 @@ export default async function VolunteersPage({
             />
           </aside>
 
-          {/* Main Content Area */}
           <main className="w-full md:w-3/4 lg:w-4/5">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center">
                 <Users className="mr-3 h-7 w-7" />
                 Meet Our Volunteers
-                <span className="ml-2 text-sm font-normal text-muted-foreground">({volunteers.length} Found)</span>
+                {!isLoading && <span className="ml-2 text-sm font-normal text-muted-foreground">({volunteers.length} Found)</span>}
               </h1>
-              {/* View toggle and sort will be part of VolunteerList component */}
             </div>
 
-            <Suspense fallback={<VolunteerListSkeleton view={view} />}>
+            {isLoading || authLoading ? (
+              <VolunteerListSkeleton view={view} />
+            ) : (
               <VolunteerList
                 initialVolunteers={volunteers}
                 currentView={view}
                 currentSortBy={sortBy}
               />
-            </Suspense>
+            )}
           </main>
         </div>
       </div>
