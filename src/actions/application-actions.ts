@@ -6,7 +6,8 @@ import {
     submitVolunteerApplication as submitAppService,
     updateApplicationStatus as updateAppStatusService,
     getOpportunityById, // Needed to award correct points
-    recordVolunteerPerformance // Import new service function
+    recordVolunteerPerformance, // Import new service function
+    hasVolunteerApplied // Import check for existing application
 } from '@/services/job-board';
 import { createConversation as createConversationService } from '@/services/messaging';
 import { createNotification } from '@/services/notification'; // Import notification service
@@ -26,6 +27,13 @@ export async function submitVolunteerApplicationAction(
 ): Promise<{ success: boolean; message: string }> {
     console.log('Server Action: Submitting application for opportunity:', applicationData.opportunityId, 'by volunteer:', volunteerId);
     try {
+        // Check if the volunteer has already applied for this opportunity
+        const alreadyApplied = await hasVolunteerApplied(volunteerId, applicationData.opportunityId);
+        if (alreadyApplied) {
+            console.log('Server Action: Volunteer', volunteerId, 'has already applied for opportunity', applicationData.opportunityId);
+            return { success: false, message: 'You have already applied for this opportunity.' };
+        }
+
         const message = await submitAppService({
             ...applicationData,
             volunteerId: volunteerId,

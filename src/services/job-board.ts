@@ -78,6 +78,20 @@ async function loadApplicationsData(): Promise<VolunteerApplication[]> {
     }));
 }
 
+/**
+ * Checks if a volunteer has already applied for a specific opportunity.
+ * @param volunteerId The ID of the volunteer.
+ * @param opportunityId The ID of the opportunity.
+ * @returns A promise that resolves to true if the volunteer has applied, false otherwise.
+ */
+export async function hasVolunteerApplied(volunteerId: string, opportunityId: string): Promise<boolean> {
+  await sleep(50); // Simulate minimal delay
+  const applicationsData = await loadApplicationsData();
+  const hasApplied = applicationsData.some(app => app.volunteerId === volunteerId && app.opportunityId === opportunityId);
+  console.log(`JobBoardService: Checked if volunteer ${volunteerId} applied for ${opportunityId}. Result: ${hasApplied}`);
+  return hasApplied;
+}
+
 
 /**
  * Asynchronously retrieves volunteer opportunities based on search keywords and categories.
@@ -476,3 +490,4 @@ export async function recordVolunteerPerformance(
   console.log('Volunteer performance recorded and saved:', applicationsData[appIndex]);
   return { ...applicationsData[appIndex] };
 }
+
