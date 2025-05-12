@@ -19,7 +19,7 @@ import {
     getRefreshedUserAction,
     updateUserProfilePictureAction,
     updateUserProfileBioSkillsCauses as updateUserProfileBioSkillsCausesAction,
-    sendPasswordResetEmailAction,
+    sendPasswordResetEmailAction, // Import the action for password reset
 } from '@/actions/auth-actions';
 import {
     acceptVolunteerApplication,
@@ -28,10 +28,11 @@ import {
     recordVolunteerPerformanceAction
 } from '@/actions/application-actions';
 import { addPointsAction, awardBadgeAction, logHoursAction } from '@/actions/gamification-actions';
-import { getUserConversationsAction, startConversationAction } from '@/actions/messaging-actions';
+import { getUserConversationsAction, startConversationAction, getConversationDetailsAction, sendMessageAction } from '@/actions/messaging-actions';
+import type { Message } from '@/services/messaging';
 
 
-export type UserRole = 'volunteer' | 'organization' | null;
+export type UserRole = 'volunteer' | 'organization' | 'admin' | null;
 
 export interface UserProfile {
   id: string;
@@ -43,7 +44,10 @@ export interface UserProfile {
   bio?: string;
   skills?: string[];
   causes?: string[];
-  onboardingCompleted?: boolean; // For future onboarding flow
+  onboardingCompleted?: boolean;
+  passwordHash?: string; // Added for storing hashed password
+  reportedBy?: string[]; // Array of user IDs who reported this user
+  isBlocked?: boolean; // Flag to indicate if user is blocked
 }
 
 interface AuthContextType {
@@ -62,12 +66,15 @@ interface AuthContextType {
   rejectApplication: (applicationId: string) => Promise<{ success: boolean; message: string; updatedApp?: VolunteerApplication | null }>;
   recordVolunteerPerformance: (applicationId: string, performanceData: { attendance: 'present' | 'absent' | 'pending'; orgRating?: number; hoursLoggedByOrg?: number; }) => Promise<{ success: boolean; message: string; updatedApplication?: VolunteerApplication | null }>;
   getUserConversations: () => Promise<(Conversation & { unreadCount: number })[]>;
+  getConversationDetails: (conversationId: string) => Promise<{ conversation: Conversation; messages: Message[] } | { error: string }>;
+  sendMessage: (conversationId: string, text: string) => Promise<{ success: boolean; message?: Message; error?: string }>;
   startConversation: (data: {
     organizationId: string;
     opportunityId: string;
     initialMessage: string;
     opportunityTitle?: string;
     organizationName?: string;
+    volunteerName?: string; // Optional, can be fetched if needed or passed from context
   }) => Promise<{ success: boolean; conversation?: Conversation; error?: string }>;
   addPoints: (userId: string, points: number, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
   awardBadge: (userId: string, badgeName: string, reason: string) => Promise<{success: boolean, newStats?: VolunteerStats | null}>;
@@ -86,12 +93,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<UserRole>(null);
-  const [isClientHydrated, setIsClientHydrated] = useState(false); // For hydration fix
+  const [isClientHydrated, setIsClientHydrated] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    setIsClientHydrated(true); // Component has mounted on client
+    setIsClientHydrated(true);
     const restoreSession = async () => {
         console.log('AuthProvider: Checking sessionStorage for existing session.');
         setLoading(true);
@@ -128,7 +135,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (typeof window !== "undefined") {
         restoreSession();
     } else {
-        setLoading(false); // Should not happen with 'use client' but good for robustness
+        setLoading(false);
     }
   }, []);
 
@@ -141,21 +148,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       onboardingCompleted: user?.onboardingCompleted,
     });
 
-    if (loading) return; // Wait for session restoration to complete
+    if (loading) return;
 
     const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
     const isSelectRolePage = pathname === '/select-role';
     const isOnboardingPage = pathname === '/onboarding';
     const isRootPage = pathname === '/';
+    const isPublicPage = ['/', '/opportunities', '/volunteers', '/about', '/how-it-works', '/contact', '/apply'].some(p => pathname.startsWith(p) && (p !== '/apply' || pathname.split('/').length > 2)); // Allow /apply/[id]
 
     if (user) {
       console.log('AuthContext: User is present and not loading.');
       if (role) {
-        if (user.onboardingCompleted === false && !isOnboardingPage) {
+        if (user.onboardingCompleted === false && !isOnboardingPage && role !== 'admin') { // Admin bypasses onboarding
           console.log(`AuthContext: User has role ${role} but onboarding not complete. Redirecting to /onboarding.`);
           router.push('/onboarding');
-        } else if (isAuthPage || isSelectRolePage || (isOnboardingPage && user.onboardingCompleted) || (isRootPage && pathname !== (role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer'))) {
-          const targetDashboard = role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer';
+        } else if (isAuthPage || isSelectRolePage || (isOnboardingPage && user.onboardingCompleted)) {
+          const targetDashboard = role === 'admin' ? '/admin' : (role === 'organization' ? '/dashboard/organization' : '/dashboard/volunteer');
           console.log(`AuthContext: Current path ${pathname} is eligible for dashboard redirect. Redirecting to ${targetDashboard}...`);
           router.push(targetDashboard);
         } else {
@@ -167,14 +175,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       } else {
         console.log(`AuthContext: User has no role, but is already on /select-role or /onboarding. No redirect needed.`);
       }
-    } else {
+    } else { // No user
       console.log('AuthContext: User is not present and not loading.');
-      const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/apply', '/chatbot', '/messages', '/onboarding'];
-      if (protectedRoutes.some(p => pathname.startsWith(p)) && !isAuthPage) {
+      const protectedRoutes = ['/dashboard', '/profile/edit', '/notifications', '/select-role', '/onboarding', '/admin', '/chatbot', '/messages'];
+      
+      if (!isPublicPage && !isAuthPage && protectedRoutes.some(p => pathname.startsWith(p))) {
          console.log(`AuthProvider: User not logged in. Current path ${pathname} is protected. Redirecting to /login.`);
          router.push('/login');
       } else {
-        console.log(`AuthContext: User not present, not loading. Path ${pathname} is not protected or is an auth page. No redirect.`);
+        console.log(`AuthContext: User not present, not loading. Path ${pathname} is public or an auth page. No redirect.`);
       }
     }
   }, [user, role, loading, router, pathname]);
@@ -235,8 +244,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
     setRole(null);
     sessionStorage.removeItem('loggedInUser');
-    await sleep(100); // Short delay to ensure state updates propagate
-    setLoading(false); // Set loading false before push to avoid race condition with redirection logic
+    await sleep(100); 
+    setLoading(false); 
     router.push('/login');
     console.log('AuthContext: Sign out complete, redirected to /login');
   }, [router]);
@@ -289,7 +298,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const result = await updateUserProfileBioSkillsCausesAction(user.id, profileData);
       if (result.success && result.user) {
         setUser(result.user);
-        setRole(result.user.role); // Role might be updated if onboarding is completed
+        setRole(result.user.role);
         sessionStorage.setItem('loggedInUser', JSON.stringify(result.user));
         return { success: true, message: result.message, user: result.user };
       } else {
@@ -434,31 +443,52 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setLoading(true);
         try {
             const result = await recordVolunteerPerformanceAction(applicationId, performanceData);
-            if (result.success && result.updatedApplication?.attendance === 'present') {
-                if (performanceData.hoursLoggedByOrg && performanceData.hoursLoggedByOrg > 0) {
-                    await logHoursAndUpdateContext(result.updatedApplication.volunteerId, performanceData.hoursLoggedByOrg, `Volunteered for ${result.updatedApplication.opportunityTitle}`);
-                }
-                if (performanceData.orgRating && performanceData.orgRating >= 4) {
-                    const ratingBonusPoints = performanceData.orgRating === 5 ? 20 : 10;
-                    await addPointsAndUpdateContext(result.updatedApplication.volunteerId, ratingBonusPoints, `Received ${performanceData.orgRating}-star rating for: ${result.updatedApplication.opportunityTitle}`);
-                }
-            }
+            // Points and hours logging are now handled within recordVolunteerPerformanceAction based on the service's response
             return result;
         } catch (error: any) {
             return { success: false, message: error.message || 'Failed to record performance.', updatedApplication: null };
         } finally {
             setLoading(false);
         }
-   }, [user, logHoursAndUpdateContext, addPointsAndUpdateContext]);
+   }, [user]);
 
     const getUserConversations = useCallback(async (): Promise<(Conversation & { unreadCount: number })[]> => {
         if (!user || !user.role) return [];
+        setLoading(true);
         try {
           return await getUserConversationsAction(user.id, user.role);
         } catch (error: any) {
           return [];
+        } finally {
+          setLoading(false);
         }
       }, [user]);
+
+    const getConversationDetails = useCallback(async (conversationId: string): Promise<{ conversation: Conversation; messages: Message[] } | { error: string }> => {
+        if (!user || !user.role) return { error: 'User not authenticated or role not set.' };
+        setLoading(true);
+        try {
+            return await getConversationDetailsAction(conversationId, user.id, user.role);
+        } catch (error: any) {
+            return { error: error.message || 'Failed to fetch conversation details.' };
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
+    const sendMessage = useCallback(async (conversationId: string, text: string): Promise<{ success: boolean; message?: Message; error?: string }> => {
+        if (!user) return { success: false, error: 'User not authenticated.' };
+        if (!text.trim()) return { success: false, error: "Message text cannot be empty." };
+        setLoading(true);
+        try {
+            return await sendMessageAction(conversationId, user.id, text);
+        } catch (error: any) {
+            return { success: false, error: error.message || 'Failed to send message.' };
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
 
     const startConversation = useCallback(async (data: {
         organizationId: string;
@@ -466,18 +496,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         initialMessage: string;
         opportunityTitle?: string;
         organizationName?: string;
+        volunteerName?: string;
       }): Promise<{ success: boolean; conversation?: Conversation; error?: string }> => {
-        if (!user || user.role !== 'volunteer') {
-            return { success: false, error: 'Only logged-in volunteers can start conversations.' };
+        if (!user || (user.role !== 'volunteer' && user.role !== 'organization')) { // Allow orgs to also start convos if needed (e.g. from a volunteer list)
+            return { success: false, error: 'User not authorized to start conversations or not logged in.' };
         }
         if (!data.initialMessage.trim()) return { success: false, error: "Initial message cannot be empty." };
         setLoading(true);
         try {
-            return await startConversationAction({
+            // Ensure volunteerId is correctly passed based on who is starting the conversation
+            // The startConversationAction needs to correctly assign senderId of the initial message
+            const payload = {
                 ...data,
-                volunteerId: user.id,
-                volunteerName: user.displayName,
-            });
+                volunteerId: user.role === 'volunteer' ? user.id : (data.volunteerId || ''), // If org starts, volunteerId must be in `data`
+                volunteerName: user.role === 'volunteer' ? user.displayName : data.volunteerName,
+                organizationId: user.role === 'organization' ? user.id : data.organizationId,
+                organizationName: user.role === 'organization' ? user.displayName : data.organizationName,
+            };
+            if (!payload.volunteerId && user.role === 'organization') {
+                return {success: false, error: "Volunteer ID is required for an organization to start a conversation."}
+            }
+
+            return await startConversationAction(payload);
         } catch (error: any) {
             return { success: false, error: error.message || 'Failed to start conversation.' };
         } finally {
@@ -486,22 +526,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, [user]);
 
 
-  if (loading) {
-    // This logic ensures consistent rendering during loading to prevent hydration errors.
-    // The server will always render the spinner if loading=true (isClientHydrated is false).
-    // The client will initially render the spinner if loading=true, then useEffect sets isClientHydrated,
-    // and it re-renders. If on an auth page, it then renders null (or minimal placeholder).
-    if (isClientHydrated && (pathname?.startsWith('/login') || pathname?.startsWith('/signup') || pathname?.startsWith('/forgot-password') || pathname === '/')) {
-      // Minimal or no skeleton for auth pages or root during initial load on client-side after hydration
-      return null; // Or <></> or a very minimal placeholder
-    } else {
-      // Default loading spinner for other pages or server-side render
-      return (
+  if (loading && !isClientHydrated) { // Only show full-page spinner during initial server render or first client load before hydration
+    return (
+       <div className="flex items-center justify-center min-h-screen bg-secondary">
+         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+       </div>
+    );
+  }
+  // After client hydration, if still loading (e.g., session restoration), show minimal or no UI for auth pages
+  if (loading && isClientHydrated && (pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password')) {
+      return null; // Or a very minimal placeholder like <div />
+  }
+  // If loading for other pages after hydration, show spinner
+  if (loading && isClientHydrated) {
+       return (
          <div className="flex items-center justify-center min-h-screen bg-secondary">
            <Loader2 className="h-12 w-12 animate-spin text-primary" />
          </div>
       );
-    }
   }
 
 
@@ -522,6 +564,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         rejectApplication,
         recordVolunteerPerformance,
         getUserConversations,
+        getConversationDetails,
+        sendMessage,
         startConversation,
         addPoints: addPointsAndUpdateContext,
         awardBadge: awardBadgeAndUpdateContext,
