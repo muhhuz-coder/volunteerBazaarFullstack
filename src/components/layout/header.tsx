@@ -176,10 +176,10 @@ export function Header() {
             </DropdownMenu>
           ) : (
              <div className="hidden md:flex items-center gap-2.5">
-               <Button variant="ghost" size="sm" asChild className="text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground rounded-md font-semibold">
+               <Button variant="ghost" size="sm" asChild className="text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground rounded-md font-semibold border border-transparent hover:border-primary-foreground/30">
                  <Link href="/login">Login</Link>
                </Button>
-               <Button variant="outline" size="sm" asChild className="border-primary-foreground/80 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground rounded-md font-semibold">
+               <Button variant="secondary" size="sm" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground hover:text-accent-foreground rounded-md font-semibold shadow-sm">
                   <Link href="/signup">Sign Up</Link>
                </Button>
              </div>
@@ -239,10 +239,10 @@ export function Header() {
                      </>
                    ) : (
                      <div className="flex flex-col gap-3.5">
-                       <Button variant="ghost" asChild className="w-full text-foreground py-3 rounded-md text-base font-semibold hover:bg-muted/80" onClick={closeMobileMenu}>
+                       <Button variant="ghost" asChild className="w-full text-primary-foreground py-3 rounded-md text-base font-semibold hover:bg-primary-foreground/15 border border-transparent hover:border-primary-foreground/30" onClick={closeMobileMenu}>
                          <Link href="/login">Login</Link>
                        </Button>
-                       <Button variant="outline" asChild className="w-full py-3 rounded-md text-base font-semibold" onClick={closeMobileMenu}>
+                       <Button variant="secondary" asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 rounded-md text-base font-semibold shadow-sm" onClick={closeMobileMenu}>
                          <Link href="/signup">Sign Up</Link>
                        </Button>
                      </div>
