@@ -2,7 +2,7 @@
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { UserCheck, Building, Search, FileText, Handshake, Users, ListChecks, UserPlus, MessagesSquare, Award } from 'lucide-react';
+import { UserCheck, Building, Search, FileText, Handshake, Users, ListChecks, UserPlus, MessagesSquare, Award, HelpCircle } from 'lucide-react';
 
 // Inline SVG for ShieldCheckIcon if not available elsewhere
 const ShieldCheckIcon = ({ className }: { className?: string }) => (
@@ -17,7 +17,7 @@ export default function HowItWorksPage() {
   const volunteerSteps = [
     { id: "v-step1", title: "Discover Opportunities", icon: Search, description: "Browse a wide range of volunteer listings. Use our search and filter tools to find roles matching your interests, skills, and location." },
     { id: "v-step2", title: "Express Interest (Apply)", icon: FileText, description: "Found an opportunity you like? Click 'Learn More & Apply' and fill out a short interest form. Optionally attach relevant documents like a resume or cover letter." },
-    { id: "v-step3", title: "Connect & Communicate", icon: MessagesSquare, description: "Organizations will review your application. If it’s a match, they’ll contact you via our secure messaging system to coordinate next steps." },
+    { id: "v-step3", title: "Connect & Communicate", icon: MessagesSquare, description: "Organizations will review your application. If it's a match, they'll contact you via our secure messaging system to coordinate next steps." },
     { id: "v-step4", title: "Volunteer & Earn Rewards", icon: Award, description: "Participate in activities, log your hours, and get rated by organizations. Earn points and badges for your contributions and climb the leaderboard!" },
   ];
 

@@ -227,3 +227,4 @@ export default function OnboardingPage() {
        </footer>
     </div>
   );
+}

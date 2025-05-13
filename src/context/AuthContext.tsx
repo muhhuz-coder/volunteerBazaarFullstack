@@ -477,13 +477,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
    }, [user, logHoursAndUpdateContext]);
 
     const getUserConversations = useCallback(async (): Promise<(Conversation & { unreadCount: number })[]> => {
-        if (!user || !user.role) return [];
-        try {
-          return await getUserConversationsAction(user.id, user.role);
-        } catch (error: any) {
-          return [];
+        if (!user || !user.id || !user.role) {
+            console.log("AuthContext: Cannot fetch conversations - missing user ID or role");
+            return [];
         }
-      }, [user]);
+        
+        // Admins don't have conversations in the current system design
+        if (user.role === 'admin') {
+            console.log("AuthContext: Admin users don't have conversations");
+            return [];
+        }
+        
+        try {
+            return await getUserConversationsAction(user.id, user.role as 'volunteer' | 'organization');
+        } catch (error: any) {
+            console.error("AuthContext: Error fetching user conversations:", error);
+            return [];
+        }
+    }, [user]);
 
     const startConversation = useCallback(async (data: {
         organizationId: string;

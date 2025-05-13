@@ -1,4 +1,3 @@
-
 // src/app/dashboard/messages/page.tsx
 'use client';
 
@@ -25,16 +24,16 @@ export default function MessagesPage() {
     const [loadingConversations, setLoadingConversations] = useState(true);
 
     const fetchMessages = useCallback(async () => {
-        if (user) {
+        if (user && user.role) {
             setLoadingConversations(true);
             try {
                 // Use the context method which internally calls the server action
                 // The action now returns ConversationWithUnread[]
                 const convos = await getUserConversations();
-                setConversations(convos); // Directly set the result
+                setConversations(convos || []); // Handle case if convos is undefined
             } catch (error) {
                 console.error("Failed to fetch conversations:", error);
-                // Optionally show a toast message here
+                setConversations([]); // Set empty array on error
             } finally {
                 setLoadingConversations(false);
             }
@@ -44,7 +43,7 @@ export default function MessagesPage() {
     useEffect(() => {
         if (!authLoading && !user) {
             router.push('/login');
-        } else if (user) {
+        } else if (user && user.role) {
             fetchMessages();
         }
     }, [user, authLoading, router, fetchMessages]);
