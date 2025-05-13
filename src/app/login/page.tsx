@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LogIn, KeyRound, Mail } from 'lucide-react';
+import { Loader2, LogIn, KeyRound, Mail, Home } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 export default function LoginPage() {
@@ -66,7 +66,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/20 p-4 selection:bg-primary/20 selection:text-primary">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/20 p-4 selection:bg-primary/20 selection:text-primary">
+      <Button
+        asChild
+        variant="ghost"
+        className="absolute top-4 left-4 flex items-center gap-2 hover:bg-background/60 hover:shadow-sm transition-all duration-200 group"
+      >
+        <Link href="/">
+          <Home className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+          <span>Back to Home</span>
+        </Link>
+      </Button>
+      
       <Card className="w-full max-w-md shadow-2xl border-primary/20 overflow-hidden rounded-xl">
         <CardHeader className="space-y-2 text-center pt-10 pb-8 bg-gradient-to-b from-primary/5 to-transparent">
           <LogIn className="mx-auto h-14 w-14 text-primary mb-3" />

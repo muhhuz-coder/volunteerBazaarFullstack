@@ -1,4 +1,3 @@
-
 // src/app/dashboard/messages/[conversationId]/page.tsx
 'use client';
 
@@ -68,7 +67,11 @@ export default function ConversationPage() {
         setLoadingConversation(true);
         setError(null); // Reset error state
         try {
-            const result = await getConversationDetailsAction(conversationId, user.id, user.role);
+            const result = await getConversationDetailsAction(
+                conversationId, 
+                user.id, 
+                user.role as 'volunteer' | 'organization'
+            );
             if ('error' in result) {
                 throw new Error(result.error);
             }
@@ -136,33 +139,46 @@ export default function ConversationPage() {
             <div className="flex flex-col min-h-screen bg-secondary">
                 <Header />
                 <div className="container mx-auto px-4 py-8 flex-grow">
-                     <Skeleton className="h-8 w-32 mb-4" /> {/* Back button skeleton */}
-                     <Card className="shadow-lg border w-full max-w-2xl mx-auto">
-                        <CardHeader className="border-b"> {/* Added border */}
-                             <Skeleton className="h-6 w-3/4" />
-                             <Skeleton className="h-4 w-1/2 mt-1" />
-                        </CardHeader>
-                         {/* Ensure proper height and padding for scrollable content */}
-                         <CardContent className="h-[60vh] space-y-4 overflow-y-auto p-4">
-                             {[...Array(5)].map((_, i) => (
-                               <div key={i} className={`flex items-start gap-3 ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
-                                  {i % 2 === 0 && <Skeleton className="h-8 w-8 rounded-full" />}
-                                  <Skeleton className="h-10 w-3/5 rounded-lg p-3" />
-                                  {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full" />}
-                               </div>
-                             ))}
-                         </CardContent>
-                         <CardFooter className="border-t pt-4"> {/* Added border and padding */}
-                            {/* More detailed skeleton for input area */}
-                            <div className="flex w-full items-center gap-2">
-                                <Skeleton className="h-16 flex-grow rounded-md" />
-                                <Skeleton className="h-10 w-10 rounded-md" />
+                    <div className="flex items-center mb-4 animate-pulse">
+                        <div className="h-8 w-8 mr-2 bg-muted/60 rounded"></div>
+                        <div className="h-5 w-24 bg-muted/60 rounded"></div>
+                    </div>
+                    
+                    <Card className="shadow-xl border w-full max-w-2xl mx-auto">
+                        <CardHeader className="border-b pb-4">
+                            <div className="flex items-center animate-pulse">
+                                <div className="h-10 w-10 rounded-full bg-muted/60 mr-3"></div>
+                                <div>
+                                    <div className="h-6 w-40 bg-muted/60 rounded mb-2"></div>
+                                    <div className="h-4 w-60 bg-muted/40 rounded"></div>
+                                </div>
                             </div>
-                         </CardFooter>
-                     </Card>
+                        </CardHeader>
+                        <CardContent className="h-[60vh] space-y-4 overflow-y-auto p-4">
+                            {[...Array(6)].map((_, i) => (
+                                <div 
+                                    key={i} 
+                                    className={`flex items-start gap-3 ${i % 2 === 0 ? 'justify-start' : 'justify-end'} animate-pulse`}
+                                    style={{ animationDelay: `${i * 150}ms` }}
+                                >
+                                    {i % 2 === 0 && <div className="h-8 w-8 rounded-full bg-muted/60"></div>}
+                                    <div 
+                                        className={`h-14 rounded-lg ${i % 2 === 0 ? 'w-3/5 bg-muted/40' : 'w-2/5 bg-primary/30'}`}
+                                    ></div>
+                                    {i % 2 !== 0 && <div className="h-8 w-8 rounded-full bg-primary/30"></div>}
+                                </div>
+                            ))}
+                        </CardContent>
+                        <CardFooter className="border-t pt-4">
+                            <div className="flex w-full items-center gap-2 animate-pulse">
+                                <div className="h-16 flex-grow rounded-md bg-muted/40"></div>
+                                <div className="h-8 w-8 rounded-full bg-muted/60"></div>
+                            </div>
+                        </CardFooter>
+                    </Card>
                 </div>
                 <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-                    <Skeleton className="h-4 w-1/3 mx-auto" />
+                    <div className="h-4 w-1/3 mx-auto bg-primary-foreground/20 rounded animate-pulse"></div>
                 </footer>
             </div>
         );
@@ -174,17 +190,24 @@ export default function ConversationPage() {
               <div className="flex flex-col min-h-screen bg-secondary">
                 <Header />
                 <div className="flex-grow flex flex-col justify-center items-center text-center px-4">
-                  <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-                  <h2 className="text-2xl font-semibold mb-2">Error Loading Conversation</h2>
-                  <p className="text-muted-foreground mb-4">{error}</p>
-                   <Button asChild variant="outline">
-                     <Link href="/dashboard/messages">
+                  <div className="relative animate-in fade-in zoom-in duration-500">
+                    <div className="absolute -inset-4 rounded-full bg-destructive/10 animate-pulse opacity-70"></div>
+                    <AlertCircle className="h-16 w-16 text-destructive relative" />
+                  </div>
+                  <h2 className="text-2xl font-semibold mt-6 mb-2 animate-in slide-in-from-bottom-3 duration-500 delay-200">Error Loading Conversation</h2>
+                  <p className="text-muted-foreground mb-6 max-w-md animate-in slide-in-from-bottom-3 duration-500 delay-300">{error}</p>
+                   <Button 
+                     asChild 
+                     variant="outline" 
+                     className="animate-in slide-in-from-bottom-3 duration-500 delay-500 hover:bg-background hover:shadow-md transition-all"
+                   >
+                     <Link href="/dashboard/messages" className="flex items-center">
                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Inbox
                      </Link>
                    </Button>
                 </div>
                  <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-                    <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+                    <p className="text-sm">&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
                  </footer>
               </div>
             );
@@ -202,7 +225,7 @@ export default function ConversationPage() {
                  <p className="text-muted-foreground">Redirecting...</p>
                </div>
                 <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-                   <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+                   <p className="text-sm">&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
                 </footer>
              </div>
            );
@@ -214,18 +237,40 @@ export default function ConversationPage() {
               <div className="flex flex-col min-h-screen bg-secondary">
                 <Header />
                 <div className="flex-grow flex flex-col justify-center items-center text-center px-4">
-                  <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-                  <h2 className="text-2xl font-semibold mb-2">Conversation Not Found</h2>
-                  <p className="text-muted-foreground mb-4">Could not load the requested conversation details.</p>
-                   <Button asChild variant="outline">
-                     <Link href="/dashboard/messages">
-                       <ArrowLeft className="mr-2 h-4 w-4" /> Back to Inbox
-                     </Link>
-                   </Button>
+                  <div className="relative animate-in fade-in zoom-in duration-500">
+                    <div className="absolute -inset-4 rounded-full bg-muted animate-pulse opacity-70"></div>
+                    <svg 
+                      className="h-16 w-16 text-muted-foreground relative" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24" 
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth="2" 
+                        d="M8 9l4-4 4 4m0 6l-4 4-4-4"
+                      />
+                    </svg>
+                  </div>
+                  <h2 className="text-2xl font-semibold mt-6 mb-2 animate-in slide-in-from-bottom-3 duration-500 delay-200">Conversation Not Found</h2>
+                  <p className="text-muted-foreground mb-6 max-w-md animate-in slide-in-from-bottom-3 duration-500 delay-300">
+                    The conversation you're looking for may have been removed or doesn't exist.
+                  </p>
+                  <Button 
+                    asChild 
+                    variant="outline" 
+                    className="animate-in slide-in-from-bottom-3 duration-500 delay-500 hover:bg-background hover:shadow-md transition-all"
+                  >
+                    <Link href="/dashboard/messages" className="flex items-center">
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Back to Inbox
+                    </Link>
+                  </Button>
                 </div>
-                 <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-                    <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
-                 </footer>
+                <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
+                   <p className="text-sm">&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
+                </footer>
               </div>
             );
     }
@@ -238,29 +283,45 @@ export default function ConversationPage() {
         <div className="flex flex-col min-h-screen bg-secondary">
             <Header />
             <div className="container mx-auto px-4 py-8 flex-grow flex flex-col">
-                 <Button asChild variant="outline" size="sm" className="mb-4 self-start">
+                 <Button 
+                    asChild 
+                    variant="ghost" 
+                    size="sm" 
+                    className="mb-4 self-start hover:bg-background/80 hover:shadow-sm transition-all duration-200 group"
+                 >
                     <Link href="/dashboard/messages">
-                      <ArrowLeft className="mr-2 h-4 w-4" /> Back to Inbox
+                      <ArrowLeft className="mr-2 h-4 w-4 group-hover:transform group-hover:-translate-x-1 transition-transform duration-200" /> 
+                      Back to Inbox
                     </Link>
                   </Button>
 
-                <Card className="shadow-lg border w-full max-w-2xl mx-auto flex-grow flex flex-col">
-                    <CardHeader className="border-b">
-                        <CardTitle>Conversation with {otherPartyName}</CardTitle>
-                        <CardDescription>Regarding: {conversation.opportunityTitle || 'General Inquiry'}</CardDescription>
+                <Card className="shadow-xl border w-full max-w-2xl mx-auto flex-grow flex flex-col animate-in fade-in slide-in-from-bottom-3 duration-500">
+                    <CardHeader className="border-b pb-4">
+                        <div className="flex items-center">
+                            <Avatar className="h-10 w-10 mr-3">
+                                <AvatarFallback className="bg-accent text-accent-foreground">
+                                    {getInitials(otherPartyName)}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <CardTitle className="text-2xl">{otherPartyName}</CardTitle>
+                                <CardDescription>Regarding: {conversation.opportunityTitle || 'General Inquiry'}</CardDescription>
+                            </div>
+                        </div>
                     </CardHeader>
                      {/* Adjust height dynamically, e.g., using viewport height minus header/footer */}
                     <CardContent className="flex-grow overflow-y-auto p-4 space-y-4 h-[calc(100vh-20rem)]"> {/* Example height */}
-                        {messages.map((msg) => (
+                        {messages.map((msg, index) => (
                             <div
                                 key={msg.id}
                                 className={cn(
-                                    "flex items-end gap-3", // Align items to bottom for better time display
+                                    "flex items-end gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300", 
+                                    index === 0 ? "delay-0" : `delay-[${Math.min(index * 50, 300)}ms]`,
                                     msg.senderId === user.id ? "justify-end" : "justify-start"
                                 )}
                             >
                                 {msg.senderId !== user.id && (
-                                    <Avatar className="h-8 w-8">
+                                    <Avatar className="h-8 w-8 animate-in fade-in zoom-in-50 duration-300">
                                         <AvatarFallback className="text-xs">
                                             {getInitials(getSenderName(msg.senderId))}
                                         </AvatarFallback>
@@ -268,7 +329,7 @@ export default function ConversationPage() {
                                 )}
                                 <div
                                     className={cn(
-                                        "max-w-[75%] rounded-lg p-3 text-sm shadow-sm", // Added shadow
+                                        "max-w-[75%] rounded-lg p-3 text-sm shadow-sm", 
                                         msg.senderId === user.id
                                             ? "bg-primary text-primary-foreground"
                                             : "bg-muted text-foreground"
@@ -276,7 +337,7 @@ export default function ConversationPage() {
                                 >
                                     <p>{msg.text}</p>
                                      <p className={cn(
-                                          "text-xs mt-1.5", // Increased margin
+                                          "text-xs mt-1.5", 
                                           msg.senderId === user.id ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-left"
                                       )}>
                                           {/* Ensure timestamp is a Date object */}
@@ -287,7 +348,7 @@ export default function ConversationPage() {
                                      </p>
                                 </div>
                                  {msg.senderId === user.id && (
-                                     <Avatar className="h-8 w-8">
+                                     <Avatar className="h-8 w-8 animate-in fade-in zoom-in-50 duration-300">
                                          <AvatarFallback className="text-xs bg-primary text-primary-foreground">
                                              {getInitials(getSenderName(msg.senderId))}
                                          </AvatarFallback>
@@ -298,32 +359,50 @@ export default function ConversationPage() {
                          <div ref={messagesEndRef} /> {/* Anchor for scrolling */}
                     </CardContent>
                     <CardFooter className="border-t pt-4">
-                        <form onSubmit={handleSendMessage} className="flex w-full items-center gap-2">
-                            <Textarea
-                                placeholder="Type your message..."
-                                value={newMessage}
-                                onChange={(e) => setNewMessage(e.target.value)}
-                                className="flex-grow resize-none bg-background"
-                                rows={1}
-                                disabled={isSending}
-                                // Handle Shift+Enter for new line, Enter to send
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault(); // Prevent newline on Enter
-                                        handleSendMessage(e); // Submit form
-                                    }
-                                }}
-                            />
-                            <Button type="submit" size="icon" disabled={!newMessage.trim() || isSending}>
-                                {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                <span className="sr-only">Send message</span>
-                            </Button>
+                        <form onSubmit={handleSendMessage} className="flex w-full items-center gap-3">
+                            <div className="relative flex-grow">
+                                <Textarea
+                                    placeholder="Type your message..."
+                                    value={newMessage}
+                                    onChange={(e) => setNewMessage(e.target.value)}
+                                    className="flex-grow resize-none bg-background pr-10 min-h-[60px] transition-all duration-200 focus:shadow-md"
+                                    rows={1}
+                                    disabled={isSending}
+                                    // Handle Shift+Enter for new line, Enter to send
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault(); // Prevent newline on Enter
+                                            handleSendMessage(e); // Submit form
+                                        }
+                                    }}
+                                />
+                                <div className="absolute right-3 bottom-3">
+                                    <Button 
+                                        type="submit" 
+                                        size="icon" 
+                                        disabled={!newMessage.trim() || isSending}
+                                        className={cn(
+                                            "rounded-full h-8 w-8 transition-all duration-300",
+                                            newMessage.trim() && !isSending ? "bg-primary hover:bg-primary/90 hover:scale-110" : "bg-muted"
+                                        )}
+                                    >
+                                        {isSending ? 
+                                            <Loader2 className="h-4 w-4 animate-spin" /> : 
+                                            <Send className={cn(
+                                                "h-4 w-4 transition-all duration-300",
+                                                newMessage.trim() ? "text-primary-foreground" : "text-muted-foreground"
+                                            )} />
+                                        }
+                                        <span className="sr-only">Send message</span>
+                                    </Button>
+                                </div>
+                            </div>
                         </form>
                     </CardFooter>
                 </Card>
             </div>
             <footer className="bg-primary text-primary-foreground text-center p-4 mt-auto">
-                <p>&copy; {new Date().getFullYear()} Volunteer Connect. All rights reserved.</p>
+                <p className="text-sm">&copy; {new Date().getFullYear()} VolunteerBazaar. All rights reserved.</p>
             </footer>
         </div>
     );

@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth, UserRole } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 // Updated icons
-import { Loader2, HandHeart, Building2 } from 'lucide-react';
+import { Loader2, HandHeart, Building2, Home } from 'lucide-react';
 
 export default function SelectRolePage() {
   // Use 'loading' from useAuth directly for initial auth state check
@@ -78,7 +79,18 @@ export default function SelectRolePage() {
 
   // Render role selection form if user is logged in but has no role
   return (
-    <div className="flex items-center justify-center min-h-screen bg-secondary p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-secondary p-4">
+      <Button
+        asChild
+        variant="ghost"
+        className="absolute top-4 left-4 flex items-center gap-2 hover:bg-background/60 hover:shadow-sm transition-all duration-200 group"
+      >
+        <Link href="/">
+          <Home className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+          <span>Back to Home</span>
+        </Link>
+      </Button>
+      
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold text-primary">Select Your Role</CardTitle>
