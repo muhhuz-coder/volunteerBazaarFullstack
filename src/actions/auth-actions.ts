@@ -6,8 +6,26 @@ import { readData, writeData, mapToObject, objectToMap } from '@/lib/db-utils';
 import type { UserProfile, UserRole } from '@/context/AuthContext';
 import type { VolunteerStats } from '@/services/gamification';
 import { getUserStats as fetchUserStats } from '@/services/gamification';
+import type { AdminReport } from '@/services/admin'; // Import AdminReport
 
 const USERS_FILE = 'users.json';
+const REPORTS_FILE = 'reports.json'; // For storing user reports
+
+// VERY BASIC HASHING - REPLACE WITH SECURE LIBRARY (e.g., bcrypt) IN PRODUCTION
+const simpleHash = (password: string): string => {
+  // This is NOT secure. It's a placeholder for demonstration.
+  // In a real app, use a library like bcrypt.
+  // Example: const salt = await bcrypt.genSalt(10); return await bcrypt.hash(password, salt);
+  return `hashed_${password}_placeholder`;
+};
+
+const compareHash = (password: string, hashedPassword?: string): boolean => {
+  if (!hashedPassword) return false;
+  // This is NOT secure.
+  // In a real app with bcrypt: return await bcrypt.compare(password, hashedPassword);
+  return `hashed_${password}_placeholder` === hashedPassword;
+};
+
 
 export async function signInUser(email: string, pass: string): Promise<{ success: boolean; message: string; user?: UserProfile | null }> {
   console.log('Server Action: Attempting sign in for:', email);
@@ -25,8 +43,11 @@ export async function signInUser(email: string, pass: string): Promise<{ success
         }
     }
 
-    if (existingUser && userEmailKey) {
+    if (existingUser && userEmailKey && compareHash(pass, existingUser.hashedPassword)) {
       let userToReturn = { ...existingUser };
+       // IMPORTANT: Remove hashedPassword before sending to client
+       delete userToReturn.hashedPassword;
+
       if (userToReturn.role === 'volunteer') {
         try {
           console.log(`AuthAction (signIn): Fetching latest stats for volunteer ${userToReturn.id}`);
@@ -68,23 +89,38 @@ export async function signUpUser(email: string, pass: string, name: string, role
       console.log('Server Action: Sign up failed, email exists:', email);
       return { success: false, message: 'Email already in use.', user: null };
     }
-    const userId = roleToSet === 'organization' ? `org_${Date.now()}` : `vol_${Date.now()}`;
+    const userId = roleToSet === 'organization' ? `org_${Date.now()}` : (roleToSet === 'admin' ? `adm_${Date.now()}` : `vol_${Date.now()}`);
+    
+    // Hash the password before storing
+    const hashedPassword = simpleHash(pass); // REPLACE with secure hashing
+
     const newUser: UserProfile = {
       id: userId,
       email: email,
       displayName: name,
       role: roleToSet,
+      hashedPassword: hashedPassword, // Store the hashed password
       stats: roleToSet === 'volunteer' ? { points: 0, badges: [], hours: 0 } : undefined,
       profilePictureUrl: undefined,
-      bio: '', // Initialize bio
-      skills: [], // Initialize skills
-      causes: [], // Initialize causes
-      onboardingCompleted: false, // Initialize onboardingCompleted
+      bio: '', 
+      skills: [], 
+      causes: [], 
+      onboardingCompleted: roleToSet === 'admin', // Admins are considered onboarded by default
     };
+
+    // Special case for admin user
+    if (email === 'admin@gmail.com' && pass === 'admin123') {
+        newUser.role = 'admin';
+        newUser.onboardingCompleted = true;
+    }
+
+
     const updatedUsersMap = usersData.set(email, newUser);
     await writeData(USERS_FILE, mapToObject(updatedUsersMap));
     console.log('Server Action: Sign up successful:', newUser);
-    const { ...userToReturn } = newUser;
+    
+    // IMPORTANT: Remove hashedPassword before sending to client
+    const { hashedPassword: _, ...userToReturn } = newUser; 
     return { success: true, message: 'Signup successful!', user: userToReturn };
   } catch (error: any) {
     console.error("Server Action: Sign up error -", error);
@@ -126,15 +162,15 @@ export async function updateUserRole(userId: string, newRole: UserRole): Promise
     } else if (newRole !== 'volunteer') {
         delete userToUpdate.stats;
     }
-    // Ensure onboardingCompleted flag is preserved or initialized if missing
+    
     if (userToUpdate.onboardingCompleted === undefined) {
-        userToUpdate.onboardingCompleted = false; // Default if was missing
+        userToUpdate.onboardingCompleted = newRole === 'admin'; // Admins onboarded by default
     }
 
     const updatedUsersMap = usersData.set(userEmail, userToUpdate);
     await writeData(USERS_FILE, mapToObject(updatedUsersMap));
     console.log('Server Action: Role update successful for:', userId);
-    const { ...userToReturn } = userToUpdate;
+    const { hashedPassword, ...userToReturn } = userToUpdate;
     return { success: true, message: 'Role updated successfully.', user: userToReturn };
   } catch (error: any) {
     console.error("Server Action: Role update error -", error);
@@ -172,7 +208,7 @@ export async function getRefreshedUserAction(userId: string): Promise<{ success:
             }
         }
         console.log('Server Action: User refresh successful for:', userId);
-        const { ...finalUser } = userToReturn;
+        const { hashedPassword, ...finalUser } = userToReturn;
         return { success: true, user: finalUser };
     } catch (error: any) {
         console.error("Server Action: User refresh error -", error);
@@ -205,7 +241,7 @@ export async function updateUserProfilePictureAction(userId: string, imageDataUr
     const updatedUsersMap = usersData.set(userEmail, userToUpdate);
     await writeData(USERS_FILE, mapToObject(updatedUsersMap));
     console.log('Server Action: Profile picture update successful for:', userId);
-    const { ...userToReturn } = userToUpdate;
+    const { hashedPassword, ...userToReturn } = userToUpdate;
     return { success: true, message: 'Profile picture updated successfully.', user: userToReturn };
   } catch (error: any) {
     console.error("Server Action: Profile picture update error -", error);
@@ -213,7 +249,7 @@ export async function updateUserProfilePictureAction(userId: string, imageDataUr
   }
 }
 
-export async function updateUserProfileBioSkillsCauses(
+export async function updateUserProfileBioSkillsCausesAction(
   userId: string,
   profileData: Partial<Pick<UserProfile, 'displayName' | 'bio' | 'skills' | 'causes' | 'onboardingCompleted'>>
 ): Promise<{ success: boolean; message: string; user?: UserProfile | null }> {
@@ -238,12 +274,12 @@ export async function updateUserProfileBioSkillsCauses(
     if (profileData.bio !== undefined) userToUpdate.bio = profileData.bio;
     if (profileData.skills !== undefined) userToUpdate.skills = profileData.skills;
     if (profileData.causes !== undefined) userToUpdate.causes = profileData.causes;
-    if (profileData.onboardingCompleted !== undefined) userToUpdate.onboardingCompleted = profileData.onboardingCompleted; // Update onboarding status
+    if (profileData.onboardingCompleted !== undefined) userToUpdate.onboardingCompleted = profileData.onboardingCompleted; 
 
     const updatedUsersMap = usersData.set(userEmailKey, userToUpdate);
     await writeData(USERS_FILE, mapToObject(updatedUsersMap));
     console.log('Server Action: Profile update successful for:', userId);
-    const { ...userToReturn } = userToUpdate;
+    const { hashedPassword, ...userToReturn } = userToUpdate;
     return { success: true, message: 'Profile updated successfully.', user: userToReturn };
   } catch (error: any) {
     console.error("Server Action: Profile update error -", error);
@@ -253,6 +289,8 @@ export async function updateUserProfileBioSkillsCauses(
 
 export async function sendPasswordResetEmailAction(email: string): Promise<{ success: boolean; message: string }> {
   console.log(`Server Action: Password reset requested for email: ${email}`);
+  // In a real app, this would generate a secure token, store it with an expiry, and send an email.
+  // For this mock, we'll just check if the user exists.
   const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
   const usersData = objectToMap(usersObject);
   let emailExists = false;
@@ -262,9 +300,42 @@ export async function sendPasswordResetEmailAction(email: string): Promise<{ suc
       break;
     }
   }
+
   if (!emailExists) {
+    // Still return a generic message to avoid confirming if an email is registered
     return { success: false, message: "If this email is registered, a reset link will be sent (mock)." };
   }
-  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Simulate email sending delay
+  await new Promise(resolve => setTimeout(resolve, 500)); 
   return { success: true, message: "If your email is registered, a password reset link has been sent (mock)." };
+}
+
+
+export async function reportUserAction(
+  reporterId: string,
+  reportedUserId: string,
+  reason: string
+): Promise<{ success: boolean; message: string }> {
+  console.log(`Server Action: User ${reporterId} reporting user ${reportedUserId} for: ${reason}`);
+  if (!reporterId || !reportedUserId || !reason) {
+    return { success: false, message: "Missing required information for reporting." };
+  }
+  try {
+    const reports = await readData<AdminReport[]>(REPORTS_FILE, []);
+    const newReport: AdminReport = {
+      id: `report_${Date.now()}`,
+      reporterId,
+      reportedUserId,
+      reason,
+      timestamp: new Date(),
+      status: 'pending',
+    };
+    reports.push(newReport);
+    await writeData(REPORTS_FILE, reports);
+    return { success: true, message: "User reported successfully. Our team will review it." };
+  } catch (error: any) {
+    console.error("Server Action: Report user error -", error);
+    return { success: false, message: error.message || 'Failed to submit report.' };
+  }
 }
