@@ -38,32 +38,56 @@ export async function signInUser(email: string, pass: string): Promise<{ success
     for (const [storedEmail, profile] of usersData.entries()) {
         if (storedEmail.toLowerCase() === email.toLowerCase()) {
             existingUser = profile;
-            userEmailKey = storedEmail;
+            userEmailKey = storedEmail; // Store the original key with its casing
             break;
         }
     }
 
-    if (existingUser && userEmailKey && compareHash(pass, existingUser.hashedPassword)) {
-      let userToReturn = { ...existingUser };
-       // IMPORTANT: Remove hashedPassword before sending to client
-       delete userToReturn.hashedPassword;
+    if (existingUser && userEmailKey) {
+      let passwordMatch = false;
+      let needsPasswordUpdate = false;
 
-      if (userToReturn.role === 'volunteer') {
-        try {
-          console.log(`AuthAction (signIn): Fetching latest stats for volunteer ${userToReturn.id}`);
-          const stats = await fetchUserStats(userToReturn.id);
-          userToReturn.stats = stats;
-        } catch (statsError) {
-           console.error(`AuthAction (signIn): Failed to fetch stats for volunteer ${userToReturn.id}:`, statsError);
-           userToReturn.stats = { points: 0, badges: [], hours: 0 };
-        }
+      // Try comparing with the new hash method first
+      if (existingUser.hashedPassword && compareHash(pass, existingUser.hashedPassword)) {
+        passwordMatch = true;
+      } else if (existingUser.hashedPassword === pass && !existingUser.hashedPassword?.startsWith('hashed_')) {
+        // Fallback: If stored password is plain text and matches input password
+        // AND it doesn't look like our hashed format (to avoid re-hashing an already hashed one by mistake)
+        console.log(`Server Action: User ${email} logged in with plain text password. Updating to hashed.`);
+        passwordMatch = true;
+        needsPasswordUpdate = true;
       }
-      console.log('Server Action: Sign in successful for:', email);
-      return { success: true, message: 'Login successful!', user: userToReturn };
-    } else {
-      console.log('Server Action: Sign in failed, user not found or password incorrect:', email);
-      return { success: false, message: 'Invalid email or password.', user: null };
+
+
+      if (passwordMatch) {
+        if (needsPasswordUpdate) {
+          existingUser.hashedPassword = simpleHash(pass);
+          // Use the original userEmailKey (with its casing) to update the map
+          const updatedUsersMap = usersData.set(userEmailKey, existingUser);
+          await writeData(USERS_FILE, mapToObject(updatedUsersMap));
+          console.log(`Server Action: Password for ${email} has been updated to hashed format.`);
+        }
+
+        let userToReturn = { ...existingUser };
+        delete userToReturn.hashedPassword; // Remove before sending to client
+
+        if (userToReturn.role === 'volunteer') {
+          try {
+            const stats = await fetchUserStats(userToReturn.id);
+            userToReturn.stats = stats;
+          } catch (statsError) {
+             console.error(`AuthAction (signIn): Failed to fetch stats for volunteer ${userToReturn.id}:`, statsError);
+             userToReturn.stats = { points: 0, badges: [], hours: 0 };
+          }
+        }
+        console.log('Server Action: Sign in successful for:', email);
+        return { success: true, message: 'Login successful!', user: userToReturn };
+      }
     }
+
+    console.log('Server Action: Sign in failed, user not found or password incorrect:', email);
+    return { success: false, message: 'Invalid email or password.', user: null };
+
   } catch (error: any) {
     console.error("Server Action: Sign in error -", error);
     return { success: false, message: 'Server error during sign in.', user: null };
@@ -339,3 +363,4 @@ export async function reportUserAction(
     return { success: false, message: error.message || 'Failed to submit report.' };
   }
 }
+
