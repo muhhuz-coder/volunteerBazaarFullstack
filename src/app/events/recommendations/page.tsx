@@ -66,7 +66,7 @@ export default function EventRecommendationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("https://c565-34-122-232-18.ngrok-free.app/volunteer/events", {
+      const response = await fetch("https://0680-34-142-204-118.ngrok-free.app/volunteer/events", {
         method: "POST",
         headers: {
           "accept": "application/json",

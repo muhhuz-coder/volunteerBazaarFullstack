@@ -86,7 +86,7 @@ export default function VolunteerRecommendationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("https://c565-34-122-232-18.ngrok-free.app/organization/volunteers", {
+      const response = await fetch("https://0680-34-142-204-118.ngrok-free.app/organization/volunteers", {
         method: "POST",
         headers: {
           "accept": "application/json",
@@ -240,7 +240,7 @@ export default function VolunteerRecommendationsPage() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {volunteer.skills.map((skill, idx) => (
-                      <Badge key={idx} variant="secondary" className="font-normal">
+                      <Badge key={idx} variant="secondary" className="bg-primary/5 border-primary/20">
                         {skill}
                       </Badge>
                     ))}
@@ -268,7 +268,7 @@ export default function VolunteerRecommendationsPage() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {volunteer.eventTypes.map((type, idx) => (
-                      <Badge key={idx} variant="secondary" className="bg-accent/10 border-accent/30 text-accent-foreground font-normal">
+                      <Badge key={idx} variant="secondary" className="bg-primary/5 border-primary/20">
                         {type}
                       </Badge>
                     ))}
