@@ -9,7 +9,7 @@ import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download, Edit3, Trash2, Edit } from 'lucide-react'; 
+import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download, Edit3, Trash2, Edit, UserSearch } from 'lucide-react'; 
 import type { Opportunity, VolunteerApplication } from '@/services/job-board'; 
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -224,13 +224,22 @@ export default function OrganizationDashboard() {
     <div className="flex flex-col min-h-screen bg-secondary">
       <Header />
       <div className="container mx-auto px-4 py-12 flex-grow"> 
-        <div className="flex flex-wrap justify-between items-center gap-4 mb-8"> 
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <h1 className="text-3xl font-bold text-primary">Organization Dashboard</h1>
-          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
-             <Link href="/dashboard/organization/create">
-              <PlusCircle className="mr-2 h-4 w-4" /> Post New Opportunity
-             </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href="/organization/volunteer-recommendations" className="flex items-center gap-2">
+                <UserSearch size={16} />
+                Find Volunteers
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard/organization/create" className="flex items-center gap-2">
+                <PlusCircle size={16} />
+                Add Opportunity
+              </Link>
+            </Button>
+          </div>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8"> 
            <Card className={cn("border", "card-hover-effect")}>

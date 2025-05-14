@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, Users, Home, Settings, Flame } from 'lucide-react'; 
+import { HandHeart as AppIcon, LogOut, LayoutDashboard, Info, HelpCircle, Mail, MessageSquare, Star, BarChart3, Edit, Bell, Briefcase, Search, Users, Home, Settings, Flame, UserSearch } from 'lucide-react'; 
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +59,7 @@ export function Header() {
          { href: "/opportunities", label: "Opportunities", icon: Search }, 
          { href: "/volunteers", label: "Volunteers", icon: Users },
          ...(role === 'volunteer' ? [{ href: "/events/recommendations", label: "Event Recommendations", icon: Flame }] : []),
+         ...(role === 'organization' ? [{ href: "/organization/volunteer-recommendations", label: "Find Volunteers", icon: UserSearch }] : []),
          { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
          { href: "/about", label: "About Us", icon: Info },
          { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
