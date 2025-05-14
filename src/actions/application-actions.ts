@@ -74,6 +74,7 @@ export async function acceptVolunteerApplication(
            organizationName: organizationName,
            volunteerName: updatedApp.applicantName,
            initialMessage: `Congratulations! Your application for "${updatedApp.opportunityTitle}" has been accepted. Let's coordinate next steps.`,
+           initialSenderId: organizationId, // Explicitly set the organization as the sender of the initial message
         });
 
         // 3. Award points for acceptance (if different from completion points)

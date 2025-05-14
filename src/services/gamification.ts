@@ -4,7 +4,8 @@ import {
   getVolunteerStats,
   addPoints as dbAddPoints,
   awardBadge as dbAwardBadge,
-  logHours as dbLogHours
+  logHours as dbLogHours,
+  getLeaderboard as dbGetLeaderboard
 } from '@/lib/db-mysql';
 import type { UserProfile } from '@/context/AuthContext'; // Assuming UserProfile is exported
 
@@ -83,18 +84,17 @@ export async function awardBadge(userId: string, badgeName: string, reason: stri
  * @returns A promise that resolves to an array of LeaderboardEntry objects, sorted by points descending.
  */
 export async function getLeaderboard(limit: number = 10): Promise<LeaderboardEntry[]> {
-    await sleep(150); // Simulate delay
     console.log(`Generating leaderboard with limit: ${limit}`);
     
-    // TODO: Implement getLeaderboard function in db-mysql.ts and use it here
-    // For now, we'll return a mock leaderboard
-    const mockLeaderboard: LeaderboardEntry[] = [
-        { userId: 'vol_1', userName: 'Top Volunteer', points: 500 },
-        { userId: 'vol_2', userName: 'Second Place', points: 450 },
-        { userId: 'vol_3', userName: 'Third Place', points: 400 }
-    ];
-    
-    return mockLeaderboard.slice(0, limit);
+    try {
+        // Use the db-mysql function to get real leaderboard data
+        const leaderboardData = await dbGetLeaderboard(limit);
+        return leaderboardData;
+    } catch (error) {
+        console.error('Error retrieving leaderboard data:', error);
+        // Return empty array if there's an error
+        return [];
+    }
 }
 
 /**

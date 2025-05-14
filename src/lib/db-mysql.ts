@@ -1792,6 +1792,34 @@ export async function recordVolunteerPerformance(
   }
 }
 
+/**
+ * Get leaderboard data
+ */
+export async function getLeaderboard(limit: number = 10): Promise<{ userId: string; userName: string; points: number }[]> {
+  const connection = await getConnection();
+  
+  try {
+    // Call the stored procedure for leaderboard
+    const [rows] = await connection.execute<any>('CALL get_leaderboard(?)', [limit]);
+    
+    // The result from a stored procedure is in the first element of the returned array
+    if (rows && rows[0]) {
+      return rows[0].map((row: any) => ({
+        userId: row.user_id,
+        userName: row.user_name,
+        points: row.points || 0
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error getting leaderboard:', error);
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 // Initialize the database connection pool
 initializeDb();
 
