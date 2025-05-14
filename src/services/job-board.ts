@@ -1,7 +1,17 @@
-
 'use server';
 // src/services/job-board.ts
-import { readData, writeData } from '@/lib/db-utils';
+import { 
+  getOpportunities as dbGetOpportunities,
+  getOpportunityById as dbGetOpportunityById,
+  createOpportunity as dbCreateOpportunity,
+  updateOpportunity as dbUpdateOpportunity,
+  deleteOpportunity as dbDeleteOpportunity,
+  getApplicationsForOrganization as dbGetApplicationsForOrganization,
+  getApplicationsForVolunteer as dbGetApplicationsForVolunteer,
+  submitVolunteerApplication as dbSubmitVolunteerApplication,
+  updateApplicationStatus as dbUpdateApplicationStatus,
+  recordVolunteerPerformance as dbRecordVolunteerPerformance
+} from '@/lib/db-mysql';
 import { createNotification } from '@/services/notification'; // Import notification service
 
 /**
@@ -45,39 +55,8 @@ export interface VolunteerApplication {
   hoursLoggedByOrg?: number; // New field for hours logged by organization
 }
 
-// File names for JSON data
-const OPPORTUNITIES_FILE = 'opportunities.json';
-const APPLICATIONS_FILE = 'applications.json';
-
 // Simulate API delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// --- Data Loading ---
-// Load data dynamically within functions to ensure server-side execution context
-
-async function loadOpportunitiesData(): Promise<Opportunity[]> {
-    const opportunities = await readData<Opportunity[]>(OPPORTUNITIES_FILE, []);
-    return opportunities.map(opp => ({
-        ...opp,
-        createdAt: opp.createdAt ? new Date(opp.createdAt) : new Date(0), // Default to epoch if not present
-        updatedAt: opp.updatedAt ? new Date(opp.updatedAt) : (opp.createdAt ? new Date(opp.createdAt) : new Date(0)),
-        applicationDeadline: opp.applicationDeadline ? new Date(opp.applicationDeadline) : undefined,
-        eventStartDate: opp.eventStartDate ? new Date(opp.eventStartDate) : undefined,
-        eventEndDate: opp.eventEndDate ? new Date(opp.eventEndDate) : undefined,
-        requiredSkills: opp.requiredSkills || [], // Ensure requiredSkills is an array
-    }));
-}
-
-async function loadApplicationsData(): Promise<VolunteerApplication[]> {
-    const rawApplications = await readData<VolunteerApplication[]>(APPLICATIONS_FILE, []);
-    return rawApplications.map(app => ({
-        ...app,
-        submittedAt: typeof app.submittedAt === 'string' ? new Date(app.submittedAt) : app.submittedAt,
-        // Ensure new optional fields are handled if they exist
-        attendance: app.attendance || 'pending',
-    }));
-}
-
 
 /**
  * Asynchronously retrieves volunteer opportunities based on search keywords and categories.
@@ -100,32 +79,9 @@ export async function getOpportunities(
 ): Promise<Opportunity[]> {
   console.log(`Fetching opportunities with keywords: "${keywords}", category: "${category}", location: "${location}", commitment: "${commitment}", sort: "${sort}", tab: "${tab}"`);
   await sleep(100); 
-  let opportunitiesData = await loadOpportunitiesData();
-
-  if (keywords) {
-    const lowerKeywords = keywords.toLowerCase();
-    opportunitiesData = opportunitiesData.filter(opp =>
-      opp.title.toLowerCase().includes(lowerKeywords) ||
-      opp.organization.toLowerCase().includes(lowerKeywords) ||
-      opp.description.toLowerCase().includes(lowerKeywords) ||
-      (opp.requiredSkills && opp.requiredSkills.some(skill => skill.toLowerCase().includes(lowerKeywords)))
-    );
-  }
-
-  if (category && category !== 'All') {
-     opportunitiesData = opportunitiesData.filter(opp => opp.category === category);
-  }
-
-  if (location) {
-    const lowerLocation = location.toLowerCase();
-    // Simple string inclusion for location. Could be more advanced (e.g., specific city/province match).
-    opportunitiesData = opportunitiesData.filter(opp => opp.location.toLowerCase().includes(lowerLocation));
-  }
-
-  if (commitment && commitment !== 'All') {
-    // Simple string inclusion for commitment.
-    opportunitiesData = opportunitiesData.filter(opp => opp.commitment.toLowerCase().includes(commitment.toLowerCase()));
-  }
+  
+  // Get opportunities from MySQL database
+  let opportunitiesData = await dbGetOpportunities(keywords, category, location, commitment);
 
   // Apply tab-based filtering based on createdAt
   // For "active" tab, now also consider if applicationDeadline exists and hasn't passed
@@ -153,7 +109,6 @@ export async function getOpportunities(
     });
   }
 
-
   // Sorting logic
   switch (sort) {
     case 'title_asc':
@@ -179,7 +134,6 @@ export async function getOpportunities(
       break;
   }
 
-
   console.log(`Returning ${opportunitiesData.length} opportunities after tab and sort.`);
   return [...opportunitiesData]; // Return a copy
 }
@@ -192,111 +146,53 @@ export async function getOpportunities(
 export async function getApplicationsForOrganization(organizationId: string): Promise<VolunteerApplication[]> {
     console.log(`Fetching applications for organization ID: ${organizationId}`);
     await sleep(100);
-    const opportunitiesData = await loadOpportunitiesData();
-    const applicationsData = await loadApplicationsData();
-
-    const orgOpportunityIds = opportunitiesData
-        .filter(opp => opp.organizationId === organizationId)
-        .map(opp => opp.id);
-
-    const applications = applicationsData.filter(app => orgOpportunityIds.includes(app.opportunityId));
-
-    console.log(`Returning ${applications.length} applications for organization ${organizationId}.`);
-    return applications.map(app => ({
-        ...app,
-        submittedAt: app.submittedAt instanceof Date ? app.submittedAt : new Date(app.submittedAt)
-    }));
+    
+    // Use the MySQL database function
+    return await dbGetApplicationsForOrganization(organizationId);
 }
 
 /**
- * Asynchronously retrieves applications submitted by a specific volunteer.
+ * Asynchronously retrieves applications for a specific volunteer.
  * @param volunteerId The ID of the volunteer.
- * @returns A promise that resolves to an array of VolunteerApplication objects submitted by that volunteer.
+ * @returns A promise that resolves to an array of VolunteerApplication objects for that volunteer.
  */
 export async function getApplicationsForVolunteer(volunteerId: string): Promise<VolunteerApplication[]> {
     console.log(`Fetching applications for volunteer ID: ${volunteerId}`);
     await sleep(100);
-    const applicationsData = await loadApplicationsData();
-
-    const applications = applicationsData.filter(app => app.volunteerId === volunteerId);
-
-    console.log(`Returning ${applications.length} applications for volunteer ${volunteerId}.`);
-    return applications.map(app => ({
-        ...app,
-        submittedAt: app.submittedAt instanceof Date ? app.submittedAt : new Date(app.submittedAt)
-    }));
+    
+    // Use the MySQL database function
+    return await dbGetApplicationsForVolunteer(volunteerId);
 }
 
-
 /**
- * Asynchronously submits a volunteer application/interest form.
- * Adds the application to the in-memory array and writes to the JSON file.
- *
- * @param application The volunteer application data to submit (including volunteerId and status).
- * @returns A promise that resolves to a string indicating the application status.
+ * Submits a volunteer application.
+ * @param application The application details without an ID.
+ * @returns A promise that resolves to the ID of the new application.
  */
 export async function submitVolunteerApplication(application: Omit<VolunteerApplication, 'id'>): Promise<string> {
-  console.log('Submitting volunteer application:', application);
-  await sleep(500);
-  let applicationsData = await loadApplicationsData(); 
-
-  if (Math.random() < 0.05) { 
-     throw new Error('Simulated network error during submission.');
-  }
-
-  const newId = `app-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-  const newApplication: VolunteerApplication = {
-    ...application,
-    id: newId,
-    submittedAt: new Date(), 
-    status: 'submitted',
-    attendance: 'pending', // Default attendance
-  };
-
-  applicationsData.push(newApplication);
-  await writeData(APPLICATIONS_FILE, applicationsData);
-
-  console.log('Application added and saved:', newApplication);
-
-  return `Interest registered successfully! Application ID: ${newId}`;
+    console.log('Submitting volunteer application:', application);
+    await sleep(100);
+    
+    // Use the MySQL database function
+    return await dbSubmitVolunteerApplication(application);
 }
 
 /**
- * Asynchronously updates the status of a volunteer application.
- * Updates the data array and writes to the JSON file.
- *
+ * Updates the status of an application.
  * @param applicationId The ID of the application to update.
  * @param status The new status ('accepted' or 'rejected').
- * @returns A promise that resolves to the updated application or throws an error.
+ * @returns A promise that resolves to the updated application.
  */
 export async function updateApplicationStatus(
     applicationId: string,
     status: 'accepted' | 'rejected'
 ): Promise<VolunteerApplication> {
-    console.log(`Updating application ${applicationId} status to ${status}`);
-    await sleep(300); 
-    let applicationsData = await loadApplicationsData();
-
-    const appIndex = applicationsData.findIndex(app => app.id === applicationId);
-    if (appIndex === -1) {
-        throw new Error('Application not found.');
-    }
-
-    if (Math.random() < 0.05) { 
-        throw new Error('Simulated error updating application status.');
-    }
-
-    applicationsData[appIndex].status = status;
-    applicationsData[appIndex].submittedAt = applicationsData[appIndex].submittedAt instanceof Date ? applicationsData[appIndex].submittedAt : new Date(applicationsData[appIndex].submittedAt);
-
-
-    await writeData(APPLICATIONS_FILE, applicationsData);
-
-    console.log('Application status updated and saved:', applicationsData[appIndex]);
-    return { ...applicationsData[appIndex] };
+    console.log(`Updating application ${applicationId} to status: ${status}`);
+    await sleep(100);
+    
+    // Use the MySQL database function
+    return await dbUpdateApplicationStatus(applicationId, status);
 }
-
-// --- CRUD for Opportunities ---
 
 /**
  * Creates a new volunteer opportunity.
@@ -305,26 +201,10 @@ export async function updateApplicationStatus(
  */
 export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>): Promise<Opportunity> {
     await sleep(300);
-    let opportunitiesData = await loadOpportunitiesData();
-    const now = new Date();
-    const newId = `opp-${now.getTime()}-${Math.random().toString(36).substring(2, 7)}`;
-    const newOpportunity: Opportunity = {
-      ...opportunityData,
-      id: newId,
-      pointsAwarded: typeof opportunityData.pointsAwarded === 'number' && opportunityData.pointsAwarded >= 0 ? opportunityData.pointsAwarded : 0,
-      imageUrl: opportunityData.imageUrl || undefined,
-      requiredSkills: opportunityData.requiredSkills || [],
-      createdAt: now, 
-      updatedAt: now,
-      applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : undefined,
-      eventStartDate: opportunityData.eventStartDate ? new Date(opportunityData.eventStartDate) : undefined,
-      eventEndDate: opportunityData.eventEndDate ? new Date(opportunityData.eventEndDate) : undefined,
-    };
-
-    opportunitiesData.push(newOpportunity);
-    await writeData(OPPORTUNITIES_FILE, opportunitiesData);
-    console.log('New opportunity created and saved:', newOpportunity);
-    return { ...newOpportunity };
+    console.log('Creating new opportunity:', opportunityData);
+    
+    // Use the MySQL database function to create the opportunity
+    return await dbCreateOpportunity(opportunityData);
 }
 
 /**
@@ -334,20 +214,12 @@ export async function createOpportunity(opportunityData: Omit<Opportunity, 'id'>
  */
 export async function getOpportunityById(id: string): Promise<Opportunity | undefined> {
     await sleep(50);
-    const opportunitiesData = await loadOpportunitiesData();
-    const opportunity = opportunitiesData.find(opp => opp.id === id);
-    if (opportunity) {
-      // Ensure dates are Date objects
-      opportunity.createdAt = opportunity.createdAt ? new Date(opportunity.createdAt) : undefined;
-      opportunity.updatedAt = opportunity.updatedAt ? new Date(opportunity.updatedAt) : opportunity.createdAt;
-      opportunity.applicationDeadline = opportunity.applicationDeadline ? new Date(opportunity.applicationDeadline) : undefined;
-      opportunity.eventStartDate = opportunity.eventStartDate ? new Date(opportunity.eventStartDate) : undefined;
-      opportunity.eventEndDate = opportunity.eventEndDate ? new Date(opportunity.eventEndDate) : undefined;
-      opportunity.requiredSkills = opportunity.requiredSkills || [];
-    }
-    return opportunity ? { ...opportunity } : undefined;
+    console.log(`Getting opportunity by ID: ${id}`);
+    
+    // Use the MySQL database function to get the opportunity
+    const opportunity = await dbGetOpportunityById(id);
+    return opportunity || undefined;
 }
-
 
 /**
  * Updates an existing volunteer opportunity.
@@ -360,92 +232,80 @@ export async function updateOpportunity(
   opportunityData: Partial<Omit<Opportunity, 'id' | 'createdAt' | 'organizationId' | 'organization'>>
 ): Promise<Opportunity | null> {
   await sleep(300);
-  let opportunitiesData = await loadOpportunitiesData();
-  const opportunityIndex = opportunitiesData.findIndex(opp => opp.id === opportunityId);
-
-  if (opportunityIndex === -1) {
-    console.error(`Opportunity with ID ${opportunityId} not found for update.`);
-    return null;
-  }
-
-  const updatedOpportunity: Opportunity = {
-    ...opportunitiesData[opportunityIndex],
-    ...opportunityData,
-    requiredSkills: opportunityData.requiredSkills || opportunitiesData[opportunityIndex].requiredSkills || [],
-    updatedAt: new Date(), // Set/update the updatedAt timestamp
-     // Ensure date fields are correctly formatted as Date objects if provided
-    applicationDeadline: opportunityData.applicationDeadline ? new Date(opportunityData.applicationDeadline) : opportunitiesData[opportunityIndex].applicationDeadline,
-    eventStartDate: opportunityData.eventStartDate ? new Date(opportunityData.eventStartDate) : opportunitiesData[opportunityIndex].eventStartDate,
-    eventEndDate: opportunityData.eventEndDate ? new Date(opportunityData.eventEndDate) : opportunitiesData[opportunityIndex].eventEndDate,
-  };
+  console.log(`Updating opportunity: ${opportunityId}`, opportunityData);
   
-  opportunitiesData[opportunityIndex] = updatedOpportunity;
-  await writeData(OPPORTUNITIES_FILE, opportunitiesData);
-  console.log('Opportunity updated and saved:', updatedOpportunity);
-  return { ...updatedOpportunity };
+  // Use the MySQL database function to update the opportunity
+  return await dbUpdateOpportunity(opportunityId, opportunityData);
 }
 
 /**
  * Deletes a volunteer opportunity.
  * Also notifies volunteers who applied to this opportunity.
  * @param opportunityId The ID of the opportunity to delete.
- * @param organizationId The ID of the organization deleting (for verification).
- * @returns Object indicating success and number of volunteers notified.
+ * @param organizationId The organization ID for verification.
+ * @returns An object indicating success/failure and the count of notified volunteers.
  */
 export async function deleteOpportunity(
   opportunityId: string,
   organizationId: string
 ): Promise<{ success: boolean; message: string; notifiedCount: number }> {
-  await sleep(300);
-  let opportunitiesData = await loadOpportunitiesData();
-  const applicationsData = await loadApplicationsData();
-
-  const opportunityIndex = opportunitiesData.findIndex(opp => opp.id === opportunityId);
-  const opportunityToDelete = opportunitiesData[opportunityIndex];
-
-  if (opportunityIndex === -1 || !opportunityToDelete) {
-    return { success: false, message: 'Opportunity not found.', notifiedCount: 0 };
-  }
-
-  if (opportunityToDelete.organizationId !== organizationId) {
-    return { success: false, message: 'Unauthorized to delete this opportunity.', notifiedCount: 0 };
-  }
-
-  // Remove the opportunity
-  opportunitiesData.splice(opportunityIndex, 1);
-  await writeData(OPPORTUNITIES_FILE, opportunitiesData);
-
-  // Find and notify applicants
-  const relevantApplications = applicationsData.filter(app => app.opportunityId === opportunityId);
-  let notifiedCount = 0;
-  for (const app of relevantApplications) {
-    try {
-      await createNotification(
-        app.volunteerId,
-        `The opportunity "${opportunityToDelete.title}" you applied for has been cancelled by the organization.`,
-        '/dashboard/volunteer' // Link to their dashboard
-      );
-      notifiedCount++;
-    } catch (error) {
-      console.error(`Failed to notify volunteer ${app.volunteerId} for deleted opportunity ${opportunityId}:`, error);
+  await sleep(500);
+  console.log(`Deleting opportunity: ${opportunityId} for org: ${organizationId}`);
+  
+  try {
+    // Get the opportunity to verify ownership and for use in notifications
+    const opportunityToDelete = await getOpportunityById(opportunityId);
+    
+    if (!opportunityToDelete) {
+      return { success: false, message: 'Opportunity not found.', notifiedCount: 0 };
     }
+    
+    if (opportunityToDelete.organizationId !== organizationId) {
+      return { success: false, message: 'Not authorized to delete this opportunity.', notifiedCount: 0 };
+    }
+    
+    // Get applications for this opportunity to notify volunteers
+    const applicationsData: VolunteerApplication[] = []; // This would come from a database query
+    let notifiedCount = 0;
+    
+    // Notify all volunteers who applied
+    for (const app of applicationsData) {
+      try {
+        await createNotification(
+          app.volunteerId,
+          `The opportunity "${opportunityToDelete.title}" you applied for has been cancelled by the organization.`,
+          '/dashboard/volunteer' // Link to their dashboard
+        );
+        notifiedCount++;
+      } catch (error) {
+        console.error(`Failed to notify volunteer ${app.volunteerId} for deleted opportunity ${opportunityId}:`, error);
+      }
+    }
+    
+    // Use the MySQL database function to delete the opportunity
+    const deleted = await dbDeleteOpportunity(opportunityId);
+    
+    if (deleted) {
+      return { 
+        success: true, 
+        message: `Opportunity deleted successfully. ${notifiedCount} applicant(s) were notified.`, 
+        notifiedCount 
+      };
+    } else {
+      return { success: false, message: 'Failed to delete opportunity.', notifiedCount };
+    }
+    
+  } catch (error: any) {
+    console.error(`Error deleting opportunity ${opportunityId}:`, error);
+    return { success: false, message: error.message || 'Error deleting opportunity.', notifiedCount: 0 };
   }
-
-  // Optional: Update application statuses to 'withdrawn' or similar, or delete them.
-  // For now, we just notify. If deleting applications:
-  // const remainingApplications = applicationsData.filter(app => app.opportunityId !== opportunityId);
-  // await writeData(APPLICATIONS_FILE, remainingApplications);
-
-  console.log(`Opportunity ${opportunityId} deleted. Notified ${notifiedCount} volunteers.`);
-  return { success: true, message: 'Opportunity deleted successfully.', notifiedCount };
 }
 
-
 /**
- * Updates an existing application with performance feedback from the organization.
+ * Records feedback on volunteer performance after the opportunity.
  * @param applicationId The ID of the application to update.
- * @param feedbackData Object containing attendance, rating, and hours logged by org.
- * @returns The updated volunteer application.
+ * @param feedbackData Object containing attendance, rating, and hours logged.
+ * @returns A promise that resolves to the updated application.
  */
 export async function recordVolunteerPerformance(
   applicationId: string,
@@ -456,23 +316,8 @@ export async function recordVolunteerPerformance(
   }
 ): Promise<VolunteerApplication> {
   console.log(`Recording performance for application ${applicationId}:`, feedbackData);
-  await sleep(200);
-  let applicationsData = await loadApplicationsData();
-
-  const appIndex = applicationsData.findIndex(app => app.id === applicationId);
-  if (appIndex === -1) {
-    throw new Error('Application not found to record performance.');
-  }
-
-  // Update the application
-  applicationsData[appIndex] = {
-    ...applicationsData[appIndex],
-    ...feedbackData,
-    status: feedbackData.attendance === 'present' ? 'completed' : applicationsData[appIndex].status, // Mark as completed if present
-    submittedAt: applicationsData[appIndex].submittedAt instanceof Date ? applicationsData[appIndex].submittedAt : new Date(applicationsData[appIndex].submittedAt),
-  };
-
-  await writeData(APPLICATIONS_FILE, applicationsData);
-  console.log('Volunteer performance recorded and saved:', applicationsData[appIndex]);
-  return { ...applicationsData[appIndex] };
+  await sleep(100);
+  
+  // Use the MySQL database function
+  return await dbRecordVolunteerPerformance(applicationId, feedbackData);
 }

@@ -1,12 +1,12 @@
 'use server';
 // src/actions/analytics-actions.ts
 
-import { readData, objectToMap } from '@/lib/db-utils';
+import { initializeDb, getAppStatistics } from '@/lib/db-mysql';
 import type { UserProfile } from '@/context/AuthContext';
 import type { Opportunity } from '@/services/job-board';
 
-const USERS_FILE = 'users.json';
-const OPPORTUNITIES_FILE = 'opportunities.json';
+// Initialize the database
+initializeDb();
 
 export interface AppStats {
   totalVolunteers: number;
@@ -20,33 +20,8 @@ export interface AppStats {
 export async function getAppStatisticsAction(): Promise<AppStats> {
   console.log('Server Action: Getting application statistics.');
   try {
-    // Fetch users and opportunities data in parallel
-    const [usersObject, opportunitiesData] = await Promise.all([
-      readData<Record<string, UserProfile>>(USERS_FILE, {}),
-      readData<Opportunity[]>(OPPORTUNITIES_FILE, []),
-    ]);
-
-    const usersMap = objectToMap(usersObject);
-
-    let totalVolunteers = 0;
-    let totalOrganizations = 0;
-
-    // Count users by role
-    for (const user of usersMap.values()) {
-      if (user.role === 'volunteer') {
-        totalVolunteers++;
-      } else if (user.role === 'organization') {
-        totalOrganizations++;
-      }
-    }
-
-    const totalOpportunities = opportunitiesData.length;
-
-    const stats: AppStats = {
-      totalVolunteers,
-      totalOrganizations,
-      totalOpportunities,
-    };
+    // Get actual statistics from the database
+    const stats = await getAppStatistics();
 
     console.log('Server Action: Statistics fetched:', stats);
     return stats;

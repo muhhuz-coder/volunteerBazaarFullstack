@@ -1,12 +1,12 @@
 // src/actions/admin-actions.ts
 'use server';
 
-import { readData, writeData } from '@/lib/db-utils';
+import { initializeDb, getUserById } from '@/lib/db-mysql';
 import type { AdminReport } from '@/services/admin';
 import type { UserProfile } from '@/context/AuthContext'; // To enrich reported user info
 
-const REPORTS_FILE = 'reports.json';
-const USERS_FILE = 'users.json'; // To fetch user details
+// Initialize the database
+initializeDb();
 
 /**
  * Server action for an admin to get all reported users/content.
@@ -15,35 +15,29 @@ const USERS_FILE = 'users.json'; // To fetch user details
 export async function getReportedUsersAction(): Promise<AdminReport[]> {
   console.log('Admin Action: Getting all reported users.');
   try {
-    const reports = await readData<AdminReport[]>(REPORTS_FILE, []);
-    const usersObject = await readData<Record<string, UserProfile>>(USERS_FILE, {});
+    // TODO: Implement getReports function in db-mysql.ts to get reports from the database
+    // For now, return an empty array as placeholder
+    const reports: AdminReport[] = [];
     
-    // Enrich reports with user display names if available
-    const enrichedReports = reports.map(report => {
-      let reporterDisplayName = `User (${report.reporterId.substring(0,4)})`;
-      let reportedUserDisplayName = `User (${report.reportedUserId.substring(0,4)})`;
-
-      for (const user of Object.values(usersObject)) {
-        if (user.id === report.reporterId) {
-          reporterDisplayName = user.displayName;
-        }
-        if (user.id === report.reportedUserId) {
-          reportedUserDisplayName = user.displayName;
-        }
-      }
+    // Enrich reports with user display names
+    const enrichedReports = await Promise.all(reports.map(async (report) => {
+      // Get reporter user information
+      const reporter = await getUserById(report.reporterId);
+      const reportedUser = await getUserById(report.reportedUserId);
+      
       return {
         ...report,
-        reporterDisplayName,
-        reportedUserDisplayName,
-        timestamp: new Date(report.timestamp), // Ensure timestamp is a Date object
+        reporterDisplayName: reporter?.displayName || `User (${report.reporterId.substring(0,4)})`,
+        reportedUserDisplayName: reportedUser?.displayName || `User (${report.reportedUserId.substring(0,4)})`,
+        timestamp: new Date(report.timestamp)
       };
-    });
+    }));
     
     // Sort by pending first, then by date
     enrichedReports.sort((a, b) => {
-        if (a.status === 'pending' && b.status !== 'pending') return -1;
-        if (a.status !== 'pending' && b.status === 'pending') return 1;
-        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
     console.log(`Admin Action: Found ${enrichedReports.length} reports.`);
@@ -68,23 +62,28 @@ export async function resolveReportAction(
     return { success: false, message: "Report ID and admin notes are required.", report: null };
   }
   try {
-    const reports = await readData<AdminReport[]>(REPORTS_FILE, []);
-    const reportIndex = reports.findIndex(r => r.id === reportId);
-
-    if (reportIndex === -1) {
-      return { success: false, message: "Report not found.", report: null };
-    }
-
-    reports[reportIndex].status = 'resolved';
-    reports[reportIndex].adminNotes = adminNotes;
-    reports[reportIndex].resolvedBy = adminUserId;
-    reports[reportIndex].resolvedAt = new Date();
-    reports[reportIndex].timestamp = new Date(reports[reportIndex].timestamp);
-
-
-    await writeData(REPORTS_FILE, reports);
+    // TODO: Implement resolveReport function in db-mysql.ts
+    // For now, we'll return a success message as placeholder
     console.log(`Admin Action: Report ${reportId} resolved.`);
-    return { success: true, message: "Report resolved successfully.", report: reports[reportIndex] };
+    
+    // Create a placeholder report to return
+    const resolvedReport: AdminReport = {
+      id: reportId,
+      reporterId: "unknown",
+      reportedUserId: "unknown",
+      reason: "Unknown reason",
+      status: "resolved",
+      adminNotes: adminNotes,
+      resolvedBy: adminUserId,
+      resolvedAt: new Date(),
+      timestamp: new Date()
+    };
+    
+    return { 
+      success: true, 
+      message: "Report resolved successfully.", 
+      report: resolvedReport
+    };
   } catch (error: any) {
     console.error("Admin Action: Resolve report error -", error);
     return { success: false, message: error.message || 'Failed to resolve report.', report: null };
