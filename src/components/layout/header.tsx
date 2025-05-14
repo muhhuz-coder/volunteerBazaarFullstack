@@ -195,56 +195,62 @@ export function Header() {
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] bg-card text-card-foreground p-5 flex flex-col shadow-2xl border-l border-border">
+              <SheetContent side="right" className="w-[300px] bg-card text-card-foreground p-5 flex flex-col shadow-2xl border-l border-border overflow-y-auto max-h-full">
                  <div className="flex items-center justify-between pb-4 border-b border-border mb-4">
                     <Link href="/" className="flex items-center gap-2.5 text-xl font-bold text-primary" onClick={closeMobileMenu}>
                       <AppIcon className="h-7 w-7" />
                       <span className="text-gradient-primary-accent">VolunteerBazaar</span>
                     </Link>
                  </div>
-                 <nav className="flex flex-col gap-2.5 mb-auto">
+                 <nav className="flex flex-col gap-2.5 mb-auto overflow-y-auto">
                     {navLinks.map(link => (
-                       <Button key={link.href} variant="ghost" asChild className="justify-start text-base py-3 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
-                         <Link href={link.href} className="flex items-center gap-3.5">
-                           {link.icon && <link.icon className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />}
-                           <span className="text-foreground transition-colors group-hover:text-primary">{link.label}</span>
+                       <Button key={link.href} variant="ghost" asChild className="justify-start text-base py-2.5 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
+                         <Link href={link.href} className="flex items-center gap-3">
+                           {link.icon && <link.icon className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary flex-shrink-0" />}
+                           <span className="text-foreground transition-colors group-hover:text-primary truncate">
+                             {link.label}
+                           </span>
                          </Link>
                        </Button>
                     ))}
                  </nav>
-                 <div className="mt-6 pt-5 border-t border-border">
+                 <div className="mt-6 pt-5 border-t border-border flex-shrink-0">
                    {user ? (
                      <>
-                       <Button variant="ghost" asChild className="justify-start w-full mb-2.5 text-base py-3 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
-                         <Link href={dashboardPath} className="flex items-center gap-3.5">
-                           <LayoutDashboard className="mr-1 h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" /> <span className="text-foreground transition-colors group-hover:text-primary">Dashboard</span>
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2.5 text-base py-2.5 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
+                         <Link href={dashboardPath} className="flex items-center gap-3">
+                           <LayoutDashboard className="mr-1 h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary flex-shrink-0" /> 
+                           <span className="text-foreground transition-colors group-hover:text-primary truncate">Dashboard</span>
                          </Link>
                        </Button>
-                       <Button variant="ghost" asChild className="justify-start w-full mb-2.5 text-base py-3 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
-                         <Link href="/profile/edit" className="flex items-center gap-3.5">
-                           <Settings className="mr-1 h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" /> <span className="text-foreground transition-colors group-hover:text-primary">Profile Settings</span>
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2.5 text-base py-2.5 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
+                         <Link href="/profile/edit" className="flex items-center gap-3">
+                           <Settings className="mr-1 h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary flex-shrink-0" /> 
+                           <span className="text-foreground transition-colors group-hover:text-primary truncate">Profile Settings</span>
                          </Link>
                        </Button>
-                       <Button variant="ghost" asChild className="justify-start w-full mb-2.5 text-base py-3 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
-                          <Link href="/dashboard/messages" className="flex items-center gap-3.5">
-                            <MessageSquare className="mr-1 h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" /> <span className="text-foreground transition-colors group-hover:text-primary">Messages</span>
+                       <Button variant="ghost" asChild className="justify-start w-full mb-2.5 text-base py-2.5 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
+                          <Link href="/dashboard/messages" className="flex items-center gap-3">
+                            <MessageSquare className="mr-1 h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary flex-shrink-0" /> 
+                            <span className="text-foreground transition-colors group-hover:text-primary truncate">Messages</span>
                           </Link>
                        </Button>
-                       <Button variant="ghost" asChild className="justify-start w-full mb-4 text-base py-3 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
-                         <Link href="/notifications" className="flex items-center gap-3.5"> 
-                           <Bell className="mr-1 h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" /> <span className="text-foreground transition-colors group-hover:text-primary">Notifications</span>
+                       <Button variant="ghost" asChild className="justify-start w-full mb-4 text-base py-2.5 px-3 rounded-md hover:bg-muted/80 group" onClick={closeMobileMenu}>
+                         <Link href="/notifications" className="flex items-center gap-3"> 
+                           <Bell className="mr-1 h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary flex-shrink-0" /> 
+                           <span className="text-foreground transition-colors group-hover:text-primary truncate">Notifications</span>
                          </Link>
                        </Button>
-                       <Button variant="destructive" size="lg" className="w-full mt-3 py-3 rounded-md text-base" onClick={() => { signOut(); closeMobileMenu(); }}>
-                         <LogOut className="mr-2 h-5 w-5" /> Log Out
+                       <Button variant="destructive" size="lg" className="w-full mt-3 py-2.5 rounded-md text-base" onClick={() => { signOut(); closeMobileMenu(); }}>
+                         <LogOut className="mr-2 h-5 w-5 flex-shrink-0" /> <span className="truncate">Log Out</span>
                        </Button>
                      </>
                    ) : (
-                     <div className="flex flex-col gap-3.5">
-                       <Button variant="secondary" asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 rounded-md text-base font-semibold shadow-sm" onClick={closeMobileMenu}>
+                     <div className="flex flex-col gap-3">
+                       <Button variant="secondary" asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-2.5 rounded-md text-base font-semibold shadow-sm" onClick={closeMobileMenu}>
                        <Link href="/login">Login</Link>
                        </Button>
-                       <Button variant="secondary" asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 rounded-md text-base font-semibold shadow-sm" onClick={closeMobileMenu}>
+                       <Button variant="secondary" asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-2.5 rounded-md text-base font-semibold shadow-sm" onClick={closeMobileMenu}>
                          <Link href="/signup">Sign Up</Link>
                        </Button>
                      </div>
