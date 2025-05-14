@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     await executeQuery(insertSql, [userId, token, expiresAt]);
     
     // Generate reset URL
-    const resetLink = `http://localhost:9002/reset-password?token=${token}`;
+    const resetLink = `http://localhost:3000/reset-password?token=${token}`;
     
     // In a real application, send an email with the reset link
     // For now, we'll just log it
