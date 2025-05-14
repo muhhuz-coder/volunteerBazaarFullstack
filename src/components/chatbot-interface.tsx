@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -13,11 +12,18 @@ import { sendMessageToChatbotAction } from '@/actions/chatbot-actions'; // Impor
 import { useToast } from '@/hooks/use-toast';
 
 export function ChatbotInterface() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Initialize with a welcome message
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { 
+      role: 'model', 
+      text: "Hi there 👋 I'm VolunteerBazaar Bot! How can I help you today?" 
+    }
+  ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [hasScrolled, setHasScrolled] = useState(false);
 
   // Function to scroll to the bottom of the chat
   const scrollToBottom = useCallback(() => {
@@ -25,17 +31,22 @@ export function ChatbotInterface() {
     if (scrollArea) {
       // Use requestAnimationFrame for smoother scrolling after render
       requestAnimationFrame(() => {
-         const scrollableViewport = scrollArea.querySelector('div'); // Adjust selector if needed
+         const scrollableViewport = scrollArea.querySelector('[data-radix-scroll-area-viewport]');
          if (scrollableViewport) {
             scrollableViewport.scrollTop = scrollableViewport.scrollHeight;
+            if (!hasScrolled) setHasScrolled(true);
          }
       });
     }
-  }, []);
+  }, [hasScrolled]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    scrollToBottom();
+    // Small delay to ensure DOM is updated
+    const timer = setTimeout(() => {
+      scrollToBottom();
+    }, 50);
+    return () => clearTimeout(timer);
   }, [messages, scrollToBottom]);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -70,28 +81,24 @@ export function ChatbotInterface() {
         setMessages((prev) => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please try again." }]);
     } finally {
       setIsLoading(false);
-       // Ensure scroll happens after state update and potential error message
-      scrollToBottom();
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-card border rounded-lg shadow-lg overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-card rounded-lg shadow-lg overflow-hidden">
       {/* Chat Messages Area */}
-      <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
-        <div className="space-y-4">
+      <ScrollArea className="flex-grow p-4 h-[calc(100%-70px)] overflow-y-auto" ref={scrollAreaRef}>
+        <div className="flex flex-col space-y-4 min-h-[50px]">
           {messages.map((message, index) => (
             <div
               key={index}
               className={cn(
-                'flex items-end gap-3',
+                'flex items-end gap-3 max-w-full',
                 message.role === 'user' ? 'justify-end' : 'justify-start'
               )}
             >
               {message.role === 'model' && (
-                <Avatar className="h-8 w-8 border border-primary/20">
-                  {/* Add a simple bot image or fallback */}
-                  {/* <AvatarImage src="/bot-avatar.png" alt="Bot" /> */}
+                <Avatar className="h-8 w-8 border border-primary/20 flex-shrink-0">
                   <AvatarFallback className="bg-primary/10 text-primary">
                     <Bot size={18} />
                   </AvatarFallback>
@@ -99,7 +106,7 @@ export function ChatbotInterface() {
               )}
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg p-3 text-sm shadow-sm',
+                  'max-w-[75%] rounded-lg p-3 text-sm shadow-sm break-words',
                   message.role === 'user'
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-foreground'
@@ -107,12 +114,11 @@ export function ChatbotInterface() {
               >
                 {/* Improve text rendering for newlines */}
                 {message.text.split('\n').map((line, i) => (
-                    <p key={i}>{line || <>&nbsp;</>}</p> // Use non-breaking space for empty lines
+                    <p key={i} className="whitespace-pre-wrap">{line || <>&nbsp;</>}</p>
                 ))}
               </div>
               {message.role === 'user' && (
-                <Avatar className="h-8 w-8 border border-muted-foreground/20">
-                   {/* Placeholder for user avatar - maybe initials? */}
+                <Avatar className="h-8 w-8 border border-muted-foreground/20 flex-shrink-0">
                   <AvatarFallback className="bg-muted/50 text-muted-foreground">
                      <User size={18}/>
                   </AvatarFallback>
@@ -122,12 +128,12 @@ export function ChatbotInterface() {
           ))}
           {isLoading && (
             <div className="flex items-end gap-3 justify-start">
-               <Avatar className="h-8 w-8 border border-primary/20">
+               <Avatar className="h-8 w-8 border border-primary/20 flex-shrink-0">
                   <AvatarFallback className="bg-primary/10 text-primary">
                     <Bot size={18} />
                   </AvatarFallback>
                 </Avatar>
-              <div className="max-w-[75%] rounded-lg p-3 text-sm shadow-sm bg-muted text-foreground">
+              <div className="rounded-lg p-3 text-sm shadow-sm bg-muted text-foreground flex items-center">
                  <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             </div>
@@ -136,7 +142,7 @@ export function ChatbotInterface() {
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="border-t p-4 bg-background/80">
+      <div className="border-t p-3 bg-background/90 mt-auto">
         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
           <Input
             type="text"
@@ -146,7 +152,7 @@ export function ChatbotInterface() {
             disabled={isLoading}
             className="flex-grow"
           />
-          <Button type="submit" size="icon" disabled={isLoading || !input.trim()} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+          <Button type="submit" size="icon" disabled={isLoading || !input.trim()} className="bg-accent hover:bg-accent/90 text-accent-foreground flex-shrink-0">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             <span className="sr-only">Send message</span>
           </Button>
