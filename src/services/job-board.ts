@@ -10,9 +10,11 @@ import {
   getApplicationsForVolunteer as dbGetApplicationsForVolunteer,
   submitVolunteerApplication as dbSubmitVolunteerApplication,
   updateApplicationStatus as dbUpdateApplicationStatus,
-  recordVolunteerPerformance as dbRecordVolunteerPerformance
+  recordVolunteerPerformance as dbRecordVolunteerPerformance,
+  getVolunteersForOpportunity as dbGetVolunteersForOpportunity
 } from '@/lib/db-mysql';
 import { createNotification } from '@/services/notification'; // Import notification service
+import type { UserProfile } from '@/context/AuthContext';
 
 /**
  * Represents a volunteer opportunity posting.
@@ -320,4 +322,17 @@ export async function recordVolunteerPerformance(
   
   // Use the MySQL database function
   return await dbRecordVolunteerPerformance(applicationId, feedbackData);
+}
+
+/**
+ * Gets all volunteers who have applied to a specific opportunity.
+ * @param opportunityId The ID of the opportunity.
+ * @returns A promise that resolves to an array of objects containing volunteer profiles and their application data.
+ */
+export async function getVolunteersForOpportunity(opportunityId: string): Promise<{application: VolunteerApplication; volunteer: UserProfile}[]> {
+  console.log(`Getting volunteers for opportunity ${opportunityId}`);
+  await sleep(100);
+  
+  // Use the MySQL database function
+  return await dbGetVolunteersForOpportunity(opportunityId);
 }

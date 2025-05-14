@@ -1820,6 +1820,120 @@ export async function getLeaderboard(limit: number = 10): Promise<{ userId: stri
   }
 }
 
+/**
+ * Get all volunteers who have applied to a specific opportunity
+ */
+export async function getVolunteersForOpportunity(opportunityId: string): Promise<{
+  application: VolunteerApplication;
+  volunteer: UserProfile;
+}[]> {
+  // First get all applications for this opportunity
+  const applicationsSql = `
+    SELECT * FROM applications 
+    WHERE opportunity_id = ?
+    ORDER BY submitted_at DESC
+  `;
+  
+  const applications = await executeQuery<any>(applicationsSql, [opportunityId]);
+  
+  if (applications.length === 0) {
+    return []; // No applications found
+  }
+  
+  // Get all volunteer IDs from applications
+  const volunteerIds = applications.map(app => app.volunteer_id);
+  const volunteerIdsPlaceholders = volunteerIds.map(() => '?').join(',');
+  
+  // Get all volunteer profiles in a single query
+  const volunteersSql = `
+    SELECT u.*, 
+           GROUP_CONCAT(DISTINCT us.skill) as skills,
+           GROUP_CONCAT(DISTINCT uc.cause) as causes,
+           vs.points, vs.hours
+    FROM users u
+    LEFT JOIN user_skills us ON u.id = us.user_id
+    LEFT JOIN user_causes uc ON u.id = uc.user_id
+    LEFT JOIN volunteer_stats vs ON u.id = vs.user_id
+    WHERE u.id IN (${volunteerIdsPlaceholders})
+    GROUP BY u.id
+  `;
+  
+  const volunteers = await executeQuery<any>(volunteersSql, volunteerIds);
+  
+  // Create a map of volunteer IDs to volunteer profiles for quick lookup
+  const volunteerMap = new Map();
+  for (const volunteer of volunteers) {
+    // Transform volunteer data into UserProfile format
+    const userProfile: UserProfile = {
+      id: volunteer.id,
+      email: volunteer.email,
+      displayName: volunteer.display_name,
+      role: volunteer.role as UserRole,
+      profilePictureUrl: volunteer.profile_picture_url,
+      bio: volunteer.bio,
+      onboardingCompleted: volunteer.onboarding_completed === 1,
+      skills: volunteer.skills ? volunteer.skills.split(',') : [],
+      causes: volunteer.causes ? volunteer.causes.split(',') : [],
+      stats: {
+        points: volunteer.points || 0,
+        hours: volunteer.hours || 0,
+        badges: [] // We'll populate badges in the next step
+      }
+    };
+    volunteerMap.set(volunteer.id, userProfile);
+  }
+  
+  // Get badges for all volunteers in one query
+  if (volunteerIds.length > 0) {
+    const badgesSql = `
+      SELECT user_id, badge 
+      FROM volunteer_badges 
+      WHERE user_id IN (${volunteerIdsPlaceholders})
+    `;
+    const badgesResult = await executeQuery<{user_id: string, badge: string}>(badgesSql, volunteerIds);
+    
+    // Populate badges for each volunteer
+    for (const badgeRow of badgesResult) {
+      const volunteer = volunteerMap.get(badgeRow.user_id);
+      if (volunteer && volunteer.stats) {
+        volunteer.stats.badges.push(badgeRow.badge);
+      }
+    }
+  }
+  
+  // Combine application data with volunteer profiles
+  return applications.map(app => {
+    const volunteer = volunteerMap.get(app.volunteer_id);
+    
+    // Transform application data
+    const application: VolunteerApplication = {
+      id: app.id,
+      opportunityId: app.opportunity_id,
+      opportunityTitle: app.opportunity_title,
+      volunteerId: app.volunteer_id,
+      applicantName: app.applicant_name,
+      applicantEmail: app.applicant_email,
+      resumeUrl: app.resume_url || '',
+      coverLetter: app.cover_letter || '',
+      status: app.status,
+      submittedAt: app.submitted_at,
+      attendance: app.attendance || 'pending',
+      orgRating: app.org_rating,
+      hoursLoggedByOrg: app.hours_logged_by_org
+    };
+    
+    return {
+      application,
+      volunteer: volunteer || {
+        id: app.volunteer_id,
+        displayName: app.applicant_name,
+        email: app.applicant_email,
+        role: 'volunteer'
+      }
+    };
+  });
+}
+
 // Initialize the database connection pool
 initializeDb();
 

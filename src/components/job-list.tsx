@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -225,7 +224,7 @@ export function OpportunityList({
         {currentView === 'grid' && ( 
           <CardFooter className="p-0 pt-4 flex flex-wrap gap-2 justify-between items-center border-t border-border mt-4">
             <Button asChild variant="link" className="text-accent p-0 h-auto font-semibold group-hover:underline text-sm rounded-md">
-              <Link href={`/apply/${opportunity.id}`} className="flex items-center gap-1.5 px-2 py-1">
+              <Link href={`/opportunities/${opportunity.id}`} className="flex items-center gap-1.5 px-2 py-1">
                 View Details <ArrowRight className="h-4 w-4 transform transition-transform duration-300 group-hover:translate-x-0.5" />
               </Link>
             </Button>
@@ -290,7 +289,7 @@ export function OpportunityList({
           </div>
           <div className="mt-auto space-y-2.5">
             <Button asChild size="default" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-md text-base">
-              <Link href={`/apply/${opportunity.id}`} className="flex items-center justify-center gap-2">
+              <Link href={`/opportunities/${opportunity.id}`} className="flex items-center justify-center gap-2">
                 <Eye className="h-4.5 w-4.5" /> View Details
               </Link>
             </Button>

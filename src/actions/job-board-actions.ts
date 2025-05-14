@@ -1,4 +1,3 @@
-
 // src/actions/job-board-actions.ts
 'use server';
 
@@ -9,7 +8,8 @@ import {
     createOpportunity as createOpportunityService, 
     getOpportunityById as getOpportunityByIdService,
     updateOpportunity as updateOpportunityService, // Import update service
-    deleteOpportunity as deleteOpportunityService // Import delete service
+    deleteOpportunity as deleteOpportunityService, // Import delete service
+    getVolunteersForOpportunity as getVolunteersForOpportunityService
 } from '@/services/job-board';
 import type { Opportunity, VolunteerApplication } from '@/services/job-board';
 
@@ -165,4 +165,22 @@ export async function deleteOpportunityAction(
         console.error("Server Action: Delete opportunity error -", error);
         return { success: false, message: error.message || 'Failed to delete opportunity.' };
     }
+}
+
+/**
+ * Server action to get all volunteers who have applied to a specific opportunity
+ */
+export async function getVolunteersForOpportunityAction(opportunityId: string): Promise<{
+  success: boolean;
+  volunteers?: {application: any; volunteer: any}[];
+  message?: string;
+}> {
+  console.log(`Server Action: Getting volunteers for opportunity ${opportunityId}`);
+  try {
+    const volunteers = await getVolunteersForOpportunityService(opportunityId);
+    return { success: true, volunteers };
+  } catch (error: any) {
+    console.error("Server Action: Get volunteers error -", error);
+    return { success: false, message: error.message || 'Failed to get volunteers for this opportunity.' };
+  }
 }

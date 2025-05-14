@@ -9,7 +9,7 @@ import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download, Edit3, Trash2, Edit, UserSearch } from 'lucide-react'; 
+import { PlusCircle, AlertCircle, Users, FileText, Check, X, MessageSquare, Loader2, Briefcase, Settings, Download, Edit3, Trash2, Edit, UserSearch, Pencil } from 'lucide-react'; 
 import type { Opportunity, VolunteerApplication } from '@/services/job-board'; 
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -282,21 +282,27 @@ export default function OrganizationDashboard() {
                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                         {opportunities.map(opp => (
                             <div key={opp.id} className="flex flex-wrap justify-between items-center p-3 bg-card/80 rounded-md border gap-2">
-                                <div className="flex-grow">
-                                    <p className="font-medium text-primary">{opp.title}</p>
-                                    <p className="text-sm text-muted-foreground">{opp.location} - {opp.category}</p>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-medium text-sm truncate">{opp.title}</h4>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                        {opp.location} • {opp.category} • {opp.commitment}
+                                    </p>
                                 </div>
-                                <div className="flex gap-2 flex-shrink-0">
-                                    <Button asChild variant="outline" size="sm">
-                                        <Link href={`/dashboard/organization/edit/${opp.id}`}>
-                                            <Edit className="mr-1 h-3.5 w-3.5" /> Edit
+                                <div className="flex items-center gap-1">
+                                    <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                                        <Link href={`/opportunities/${opp.id}`} title="View Volunteers">
+                                            <Users className="h-4 w-4" />
+                                        </Link>
+                                    </Button>
+                                    <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                                        <Link href={`/dashboard/organization/edit/${opp.id}`} title="Edit Opportunity">
+                                            <Pencil className="h-4 w-4" />
                                         </Link>
                                     </Button>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
-                                            <Button variant="destructive" size="sm" disabled={deletingOppId === opp.id}>
-                                                {deletingOppId === opp.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1 h-3.5 w-3.5" />}
-                                                Delete
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Delete Opportunity">
+                                                <Trash2 className="h-4 w-4" />
                                             </Button>
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
