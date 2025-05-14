@@ -1,4 +1,3 @@
-
 // src/app/opportunities/page.tsx
 import { Header } from '@/components/layout/header';
 import { OpportunitySearch } from '@/components/job-search';
@@ -6,7 +5,7 @@ import { OpportunityList } from '@/components/job-list';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getOpportunitiesAction } from '@/actions/job-board-actions';
-import { Briefcase, MapPin, Activity, Clock, Star, CalendarClock, CalendarDays, ListFilter, Sparkles } from 'lucide-react'; // Added Sparkles
+import { Briefcase, MapPin, Activity, Clock, Star, CalendarClock, CalendarDays, ListFilter, Sparkles, Flame } from 'lucide-react'; // Added Flame
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import Link from 'next/link';
@@ -177,6 +176,15 @@ export default async function OpportunitiesPage({
                 Volunteer Opportunities
               </h1>
                <span className="text-base font-medium text-muted-foreground whitespace-nowrap">({opportunities.length} results in "{currentTab.charAt(0).toUpperCase() + currentTab.slice(1)}" list)</span>
+            </div>
+
+            <div className="flex justify-between items-center mb-6">
+              <Button asChild variant="outline" className="gap-2 bg-background hover:bg-accent/10 border-accent/30">
+                <Link href="/events/recommendations">
+                  <Flame className="h-4 w-4 text-accent" />
+                  <span>Event Recommendations</span>
+                </Link>
+              </Button>
             </div>
 
             <Tabs value={currentTab} className="mb-8">
