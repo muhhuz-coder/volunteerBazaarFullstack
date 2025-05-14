@@ -1,4 +1,3 @@
-
 // src/actions/application-actions.ts
 'use server';
 
@@ -32,13 +31,20 @@ export async function submitVolunteerApplicationAction(
             applicantName: applicantName, // Ensure name from context is used
             status: 'submitted', // Explicitly set status
             attendance: 'pending', // Default attendance
+            submittedAt: new Date(), // Add submittedAt field
         });
 
         // Note: Points are awarded in the AuthContext after this action succeeds
 
-        return { success: true, message: message };
+        return { success: true, message: "Application submitted successfully!" };
     } catch (error: any) {
         console.error("Server Action: Submit application error -", error);
+        
+        // Check if this is a duplicate application error
+        if (error.message && error.message.includes("already applied")) {
+            return { success: false, message: "You have already applied to this opportunity." };
+        }
+        
         return { success: false, message: error.message || 'Failed to submit application.' };
     }
 }

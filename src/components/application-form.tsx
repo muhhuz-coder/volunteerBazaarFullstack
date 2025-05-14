@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -164,9 +163,16 @@ export function VolunteerApplicationForm({ opportunity }: VolunteerApplicationFo
       }
     } catch (error) {
       console.error('Submission failed:', error);
+      
+      // Check if the error message indicates a duplicate application
+      const errorMessage = error instanceof Error ? error.message : 'There was an error submitting your interest. Please try again.';
+      const isDuplicateApplication = typeof errorMessage === 'string' && 
+                                    (errorMessage.includes('already applied') || 
+                                     errorMessage.includes('duplicate application'));
+      
       toast({
-        title: 'Submission Failed',
-        description: 'There was an error submitting your interest. Please try again.',
+        title: isDuplicateApplication ? 'Already Applied' : 'Submission Failed',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

@@ -1462,6 +1462,22 @@ export async function submitVolunteerApplication(application: Omit<VolunteerAppl
   try {
     await connection.beginTransaction();
     
+    // First check if the volunteer has already applied to this opportunity
+    const checkSql = `
+      SELECT id FROM applications 
+      WHERE volunteer_id = ? AND opportunity_id = ?
+    `;
+    
+    const existingApplications = await connection.execute<any>(checkSql, [
+      application.volunteerId,
+      application.opportunityId
+    ]);
+    
+    // If an application already exists, throw an error
+    if (existingApplications[0].length > 0) {
+      throw new Error("You have already applied to this opportunity.");
+    }
+    
     // Generate a unique ID
     const appId = `app-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     

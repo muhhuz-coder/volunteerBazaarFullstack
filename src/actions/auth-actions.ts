@@ -19,17 +19,45 @@ initializeDb();
 
 // VERY BASIC HASHING - REPLACE WITH SECURE LIBRARY (e.g., bcrypt) IN PRODUCTION
 const simpleHash = (password: string): string => {
-  // This is NOT secure. It's a placeholder for demonstration.
-  // In a real app, use a library like bcrypt.
-  // Example: const salt = await bcrypt.genSalt(10); return await bcrypt.hash(password, salt);
-  return `hashed_${password}_placeholder`;
+  // Using crypto for password hashing
+  const crypto = require('crypto');
+  // Generate a random salt
+  const salt = crypto.randomBytes(16).toString('hex');
+  // Hash the password with the salt using SHA-256
+  const hash = crypto
+    .createHash('sha256')
+    .update(password + salt)
+    .digest('hex');
+  
+  // Store password as salt:hash
+  return `${salt}:${hash}`;
 };
 
 const compareHash = (password: string, hashedPassword?: string): boolean => {
   if (!hashedPassword) return false;
-  // This is NOT secure.
-  // In a real app with bcrypt: return await bcrypt.compare(password, hashedPassword);
-  return `hashed_${password}_placeholder` === hashedPassword;
+  
+  // Check if it's our older placeholder hash format
+  if (hashedPassword.startsWith('hashed_')) {
+    return `hashed_${password}_placeholder` === hashedPassword;
+  }
+  
+  // Check if it's our newer crypto format (salt:hash)
+  if (hashedPassword.includes(':')) {
+    const crypto = require('crypto');
+    const [salt, storedHash] = hashedPassword.split(':');
+    
+    // Compute the hash of the provided password with the stored salt
+    const hash = crypto
+      .createHash('sha256')
+      .update(password + salt)
+      .digest('hex');
+    
+    // Compare the computed hash with the stored hash
+    return hash === storedHash;
+  }
+  
+  // Fall back to simple equality for plain text passwords (should be rare/never)
+  return password === hashedPassword;
 };
 
 export async function signInUser(email: string, pass: string): Promise<{ success: boolean; message: string; user?: UserProfile | null }> {

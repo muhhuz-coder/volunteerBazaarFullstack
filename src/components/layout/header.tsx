@@ -58,8 +58,8 @@ export function Header() {
          { href: "/", label: "Home", icon: Home },
          { href: "/opportunities", label: "Opportunities", icon: Search }, 
          { href: "/volunteers", label: "Volunteers", icon: Users },
-         ...(role === 'volunteer' ? [{ href: "/events/recommendations", label: "Event Recommendations", icon: Flame }] : []),
-         ...(role === 'organization' ? [{ href: "/organization/volunteer-recommendations", label: "Find Volunteers", icon: UserSearch }] : []),
+        //  ...(role === 'volunteer' ? [{ href: "/events/recommendations", label: "Event Recommendations", icon: Flame }] : []),
+        //  ...(role === 'organization' ? [{ href: "/organization/volunteer-recommendations", label: "Find Volunteers", icon: UserSearch }] : []),
          { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
          { href: "/about", label: "About Us", icon: Info },
          { href: "/how-it-works", label: "How It Works", icon: HelpCircle },
@@ -179,7 +179,7 @@ export function Header() {
           ) : (
              <div className="hidden md:flex items-center gap-2.5">
                <Button variant="ghost" size="sm" asChild className="text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground rounded-md font-semibold border border-transparent hover:border-primary-foreground/30">
-                 <Link href="/login">Login</Link>
+               <Link href="/login">Login</Link>
                </Button>
                <Button variant="secondary" size="sm" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground hover:text-accent-foreground rounded-md font-semibold shadow-sm">
                   <Link href="/signup">Sign Up</Link>
@@ -241,8 +241,8 @@ export function Header() {
                      </>
                    ) : (
                      <div className="flex flex-col gap-3.5">
-                       <Button variant="ghost" asChild className="w-full text-primary-foreground py-3 rounded-md text-base font-semibold hover:bg-primary-foreground/15 border border-transparent hover:border-primary-foreground/30" onClick={closeMobileMenu}>
-                         <Link href="/login">Login</Link>
+                       <Button variant="secondary" asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 rounded-md text-base font-semibold shadow-sm" onClick={closeMobileMenu}>
+                       <Link href="/login">Login</Link>
                        </Button>
                        <Button variant="secondary" asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 rounded-md text-base font-semibold shadow-sm" onClick={closeMobileMenu}>
                          <Link href="/signup">Sign Up</Link>

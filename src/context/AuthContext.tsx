@@ -412,7 +412,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
          return { success: false, message: submitResult.message || 'Application submission failed.' };
       }
     } catch (error: any) {
-      return { success: false, message: error.message || 'Application submission failed.' };
+      const errorMessage = error.message || 'Application submission failed.';
+      
+      // Check if it's a duplicate application error
+      if (errorMessage.includes("already applied")) {
+        return { success: false, message: "You have already applied to this opportunity." };
+      }
+      
+      return { success: false, message: errorMessage };
     } finally {
       setLoading(false);
     }
