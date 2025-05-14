@@ -942,6 +942,7 @@ export async function createConversation(data: {
   opportunityTitle?: string;
   organizationName?: string;
   volunteerName?: string;
+  initialSenderId?: string;
 }): Promise<Conversation> {
   const connection = await getConnection();
   
@@ -1009,13 +1010,18 @@ export async function createConversation(data: {
     
     // Add the initial message
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    
+    // Determine the sender of the initial message - default to volunteerId if not specified
+    // since most conversations are started by volunteers from opportunity pages
+    const initialSenderId = data.initialSenderId || data.volunteerId;
+    
     await connection.execute(
       `INSERT INTO messages (id, conversation_id, sender_id, text, timestamp, is_read)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [
         messageId,
         conversationId,
-        data.organizationId, // Assuming the organization sends the first message
+        initialSenderId, // Use the correct sender ID
         data.initialMessage,
         now,
         false
@@ -1025,7 +1031,10 @@ export async function createConversation(data: {
     await connection.commit();
     
     // Get the full conversation with the new message
-    const conversation = await getConversationDetails(conversationId, data.organizationId, 'organization');
+    const userIdForDetails = initialSenderId === data.volunteerId ? data.volunteerId : data.organizationId;
+    const userRoleForDetails = initialSenderId === data.volunteerId ? 'volunteer' : 'organization';
+    
+    const conversation = await getConversationDetails(conversationId, userIdForDetails, userRoleForDetails);
     return conversation.conversation;
     
   } catch (error) {

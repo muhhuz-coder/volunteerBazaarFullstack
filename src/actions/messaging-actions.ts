@@ -1,4 +1,3 @@
-
 // src/actions/messaging-actions.ts
 'use server';
 
@@ -80,20 +79,15 @@ export async function startConversationAction(data: {
     }
     try {
         // Call the service function to create or get the conversation
-        // NOTE: The service `createConversation` now needs adjustment to accept the initial message sender correctly.
-        // Let's assume for now the service handles this (e.g., determines sender based on who calls).
-        // Or, we modify the service or add a new one specifically for volunteer initiation.
-
-        // TEMPORARY ADJUSTMENT: For now, let's simulate the service handling the volunteer as sender.
-        // A better approach would be to modify `createConversationService` to accept senderId for the initial message.
+        // Now passing the volunteerId as the initialSenderId to properly attribute the message
         const conversation = await createConversationService({
             ...data,
             // Pass volunteer name if available
             volunteerName: data.volunteerName,
             organizationName: data.organizationName,
-            // Modify the initial message slightly to indicate it's from the volunteer
-            // OR modify the service to handle this better
-            initialMessage: data.initialMessage, // Service needs to know who sent this
+            // Set the volunteerId as the sender of the initial message
+            initialSenderId: data.volunteerId,
+            initialMessage: data.initialMessage
         });
 
         // If the conversation was newly created or retrieved successfully

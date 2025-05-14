@@ -53,6 +53,7 @@ export async function createConversation(data: {
     opportunityTitle?: string;
     organizationName?: string;
     volunteerName?: string;
+    initialSenderId?: string; // Added to specify who sent the initial message
 }): Promise<Conversation> {
     await sleep(100); // Minimal delay for better UX
     console.log('Creating conversation between organization', data.organizationId, 'and volunteer', data.volunteerId, 'for opportunity', data.opportunityId);

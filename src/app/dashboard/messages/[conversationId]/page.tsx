@@ -311,51 +311,54 @@ export default function ConversationPage() {
                     </CardHeader>
                      {/* Adjust height dynamically, e.g., using viewport height minus header/footer */}
                     <CardContent className="flex-grow overflow-y-auto p-4 space-y-4 h-[calc(100vh-20rem)]"> {/* Example height */}
-                        {messages.map((msg, index) => (
-                            <div
-                                key={msg.id}
-                                className={cn(
-                                    "flex items-end gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300", 
-                                    index === 0 ? "delay-0" : `delay-[${Math.min(index * 50, 300)}ms]`,
-                                    msg.senderId === user.id ? "justify-end" : "justify-start"
-                                )}
-                            >
-                                {msg.senderId !== user.id && (
-                                    <Avatar className="h-8 w-8 animate-in fade-in zoom-in-50 duration-300">
-                                        <AvatarFallback className="text-xs">
-                                            {getInitials(getSenderName(msg.senderId))}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                )}
+                        {messages.map((msg, index) => {
+                            const isUserMessage = msg.senderId === user.id; // Explicitly check for user ID match
+                            return (
                                 <div
+                                    key={msg.id}
                                     className={cn(
-                                        "max-w-[75%] rounded-lg p-3 text-sm shadow-sm", 
-                                        msg.senderId === user.id
-                                            ? "bg-primary text-primary-foreground"
-                                            : "bg-muted text-foreground"
+                                        "flex items-end gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300", 
+                                        index === 0 ? "delay-0" : `delay-[${Math.min(index * 50, 300)}ms]`,
+                                        isUserMessage ? "justify-end" : "justify-start"
                                     )}
                                 >
-                                    <p>{msg.text}</p>
-                                     <p className={cn(
-                                          "text-xs mt-1.5", 
-                                          msg.senderId === user.id ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-left"
-                                      )}>
-                                          {/* Ensure timestamp is a Date object */}
-                                         {msg.timestamp instanceof Date
-                                             ? msg.timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                                             : 'Invalid Date'
-                                         }
-                                     </p>
+                                    {!isUserMessage && (
+                                        <Avatar className="h-8 w-8 animate-in fade-in zoom-in-50 duration-300">
+                                            <AvatarFallback className="text-xs">
+                                                {getInitials(getSenderName(msg.senderId))}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    )}
+                                    <div
+                                        className={cn(
+                                            "max-w-[75%] rounded-lg p-3 text-sm shadow-sm", 
+                                            isUserMessage
+                                                ? "bg-primary text-primary-foreground"
+                                                : "bg-muted text-foreground"
+                                        )}
+                                    >
+                                        <p>{msg.text}</p>
+                                         <p className={cn(
+                                              "text-xs mt-1.5", 
+                                              isUserMessage ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-left"
+                                          )}>
+                                              {/* Ensure timestamp is a Date object */}
+                                             {msg.timestamp instanceof Date
+                                                 ? msg.timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                                                 : 'Invalid Date'
+                                             }
+                                         </p>
+                                    </div>
+                                     {isUserMessage && (
+                                         <Avatar className="h-8 w-8 animate-in fade-in zoom-in-50 duration-300">
+                                             <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                                                 {getInitials(getSenderName(msg.senderId))}
+                                             </AvatarFallback>
+                                         </Avatar>
+                                     )}
                                 </div>
-                                 {msg.senderId === user.id && (
-                                     <Avatar className="h-8 w-8 animate-in fade-in zoom-in-50 duration-300">
-                                         <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                                             {getInitials(getSenderName(msg.senderId))}
-                                         </AvatarFallback>
-                                     </Avatar>
-                                 )}
-                            </div>
-                        ))}
+                            );
+                        })}
                          <div ref={messagesEndRef} /> {/* Anchor for scrolling */}
                     </CardContent>
                     <CardFooter className="border-t pt-4">
